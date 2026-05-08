@@ -58,6 +58,7 @@ export default function RootLayout() {
           <Stack.Screen name="alvo" options={{ title: 'Alvo de Vida' }} />
           <Stack.Screen name="area/[id]" options={{ title: '' }} />
           <Stack.Screen name="tarefa/[id]" options={{ title: '' }} />
+          <Stack.Screen name="dia/[iso]" options={{ title: '' }} />
           <Stack.Screen name="reflexao" options={{ title: 'Reflexão' }} />
           <Stack.Screen name="reativacao" options={{ title: 'Reativação', headerBackVisible: false }} />
         </Stack>

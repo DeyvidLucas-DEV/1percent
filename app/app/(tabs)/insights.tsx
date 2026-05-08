@@ -178,7 +178,7 @@ export default function Insights() {
           <View style={styles.card}>
             <Text style={styles.cardKicker}>CALENDÁRIO</Text>
             <View style={{ marginTop: 12 }}>
-              <CalendarGrid data={data.percPorDia} />
+              <CalendarGrid data={data.percPorDia} onTap={iso => router.push(`/dia/${iso}`)} />
             </View>
             <View style={styles.legendaFaixas}>
               {([
