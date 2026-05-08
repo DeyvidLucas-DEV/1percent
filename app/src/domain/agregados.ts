@@ -26,6 +26,8 @@ export type DashboardData = {
   execucoesHoje: number;
   intensidade: Intensidade;
   mediocridade: { score: number; faixa: FaixaMediocridade };
+  percPorDia: { data: string; pct: number }[];
+  mediaMes: number;
 };
 
 export async function carregarDashboard(): Promise<DashboardData> {
@@ -42,19 +44,26 @@ export async function carregarDashboard(): Promise<DashboardData> {
   const exec28 = await execucoesEntre(dias28[0], hoje);
   const execHoje = exec7.filter(e => e.data === hoje);
 
+  // Janela de 7d se adapta ao tempo desde o onboarding — usuário com 1 dia de uso
+  // não pode ser penalizado pelos 6 dias anteriores que ele nem tinha o app.
+  const dias7Validos = onboardedDia
+    ? Math.min(7, dias7.filter(d => d >= onboardedDia).length)
+    : 7;
+  const exec7Validas = onboardedDia ? exec7.filter(e => e.data >= onboardedDia) : exec7;
+
   const porArea: ResumoArea[] = areas.map(area => {
     const tarefasArea = tarefas.filter(t => t.area_id === area.id);
     const execHojeArea = execHoje.filter(e =>
       tarefasArea.some(t => t.id === e.tarefa_id)
     );
-    const exec7Area = exec7.filter(e =>
+    const exec7Area = exec7Validas.filter(e =>
       tarefasArea.some(t => t.id === e.tarefa_id)
     );
     return {
       area,
       tarefas: tarefasArea,
       percentualHoje: percentualArea(tarefasArea, execHojeArea, 1),
-      percentual7d: percentualArea(tarefasArea, exec7Area, 7),
+      percentual7d: percentualArea(tarefasArea, exec7Area, Math.max(1, dias7Validos)),
     };
   });
 
@@ -120,6 +129,14 @@ export async function carregarDashboard(): Promise<DashboardData> {
   const score = scoreMediocridade(exec28, percSemanais);
   const intensidade = classificarIntensidade(tarefas, exec28);
 
+  // Só inclui dias desde o onboarding — antes disso o usuário não tinha dado, mostrar 0%
+  // distorce a média e enche o calendário/gráfico de marrom enganoso.
+  const dias28Visiveis = onboardedDia ? dias28.filter(d => d >= onboardedDia) : dias28;
+  const percPorDiaArr = dias28Visiveis.map(d => ({ data: d, pct: percPorDia.get(d) ?? 0 }));
+  const mediaMes = percPorDiaArr.length
+    ? Math.round(percPorDiaArr.reduce((s, x) => s + x.pct, 0) / percPorDiaArr.length)
+    : 0;
+
   return {
     porArea,
     percentualHoje: percHoje,
@@ -129,5 +146,7 @@ export async function carregarDashboard(): Promise<DashboardData> {
     execucoesHoje: execHoje.length,
     intensidade,
     mediocridade: { score, faixa: faixaMediocridade(score) },
+    percPorDia: percPorDiaArr,
+    mediaMes,
   };
 }

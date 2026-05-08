@@ -46,6 +46,7 @@ export default function RootLayout() {
             headerTintColor: tema.texto,
             contentStyle: { backgroundColor: tema.bg },
             headerShadowVisible: false,
+            headerBackTitle: 'Voltar',
           }}
         >
           <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -55,6 +56,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding/autoavaliacao" options={{ title: 'Onde você está' }} />
           <Stack.Screen name="checklist" options={{ title: 'Checklist do dia' }} />
           <Stack.Screen name="alvo" options={{ title: 'Alvo de Vida' }} />
+          <Stack.Screen name="area/[id]" options={{ title: '' }} />
           <Stack.Screen name="reflexao" options={{ title: 'Reflexão' }} />
           <Stack.Screen name="reativacao" options={{ title: 'Reativação', headerBackVisible: false }} />
         </Stack>

@@ -18,6 +18,12 @@ export async function listarTodasAreas(): Promise<Area[]> {
   return db.getAllAsync<Area>('SELECT * FROM areas ORDER BY ordem ASC');
 }
 
+export async function buscarAreaPorId(id: number): Promise<Area | null> {
+  const db = await getDb();
+  const r = await db.getFirstAsync<Area>(`SELECT * FROM areas WHERE id = ?`, [id]);
+  return r ?? null;
+}
+
 export async function pausarArea(
   areaId: number,
   pausarAte: string,
