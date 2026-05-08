@@ -10,11 +10,12 @@ import { tema } from '../src/lib/tema';
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const { inicializado, onboarded, setInicializado, setOnboarded } = useAppStore();
+  const { inicializado, logado, onboarded, setInicializado, setLogado, setOnboarded } = useAppStore();
 
   useEffect(() => {
     (async () => {
       const r = await bootstrap();
+      setLogado(r.userUuid);
       setOnboarded(r.onboarded);
       setInicializado(true);
     })();
@@ -22,13 +23,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!inicializado) return;
-    const emOnboarding = segments[0] === 'onboarding';
-    if (!onboarded && !emOnboarding) {
+    const rota = segments[0];
+    const emLogin = rota === 'login';
+    const emOnboarding = rota === 'onboarding';
+
+    if (!logado && !emLogin) {
+      router.replace('/login');
+    } else if (logado && !onboarded && !emOnboarding) {
       router.replace('/onboarding/cadastro');
-    } else if (onboarded && emOnboarding) {
+    } else if (logado && onboarded && (emLogin || emOnboarding)) {
       router.replace('/');
     }
-  }, [inicializado, onboarded, segments]);
+  }, [inicializado, logado, onboarded, segments]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: tema.bg }}>
@@ -42,6 +48,7 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         >
+          <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ title: 'Hoje' }} />
           <Stack.Screen name="onboarding/cadastro" options={{ title: 'Cadastro', headerBackVisible: false }} />
           <Stack.Screen name="onboarding/areas" options={{ title: 'Suas áreas' }} />

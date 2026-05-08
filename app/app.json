@@ -15,7 +15,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.umporcento.app"
+      "bundleIdentifier": "com.umporcento.app",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["umporcento"]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.863364734205-pauis7u6qhm56rqtq76uv6d24vc94lac"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.umporcento.app",
@@ -34,7 +46,8 @@
       "expo-router",
       "expo-sqlite",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

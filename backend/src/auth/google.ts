@@ -15,8 +15,26 @@ export type GoogleClaims = {
   email_verified?: boolean;
 };
 
+function decodeUnsafePayload(token: string): Record<string, unknown> | null {
+  try {
+    const partes = token.split('.');
+    if (partes.length !== 3) return null;
+    const json = Buffer.from(partes[1]!, 'base64url').toString('utf8');
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export async function validarTokenGoogle(idToken: string): Promise<GoogleClaims> {
   if (!audience) throw new Error('GOOGLE_CLIENT_ID ausente no servidor');
+
+  // Debug: log claims antes da verificação
+  const peek = decodeUnsafePayload(idToken);
+  console.log('[auth/google] expected aud =', JSON.stringify(audience));
+  console.log('[auth/google] token aud    =', JSON.stringify(peek?.aud));
+  console.log('[auth/google] token iss    =', JSON.stringify(peek?.iss));
+
   const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
     issuer: GOOGLE_ISSUERS,
     audience,

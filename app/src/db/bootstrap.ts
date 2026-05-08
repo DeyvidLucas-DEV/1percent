@@ -2,18 +2,22 @@ import { initSchema } from './schema';
 import { seedIfEmpty } from './seed';
 import { getUser } from './queries/users';
 import { pedirPermissao, agendarLembretesDiarios } from '../lib/notificacoes';
+import { lerSessao } from '../auth/sessao';
 
 export type BootstrapResult = {
+  logado: boolean;
+  userUuid: string | null;
   onboarded: boolean;
 };
 
 export async function bootstrap(): Promise<BootstrapResult> {
   await initSchema();
   await seedIfEmpty();
+  const sessao = await lerSessao();
   const user = await getUser();
   const onboarded = !!user?.onboarded_at;
 
-  if (onboarded) {
+  if (sessao && onboarded) {
     try {
       const ok = await pedirPermissao();
       if (ok) await agendarLembretesDiarios();
@@ -22,5 +26,5 @@ export async function bootstrap(): Promise<BootstrapResult> {
       // mas locais agendadas funcionam. Seguimos sem travar o boot se falhar.
     }
   }
-  return { onboarded };
+  return { logado: !!sessao, userUuid: sessao?.userUuid ?? null, onboarded };
 }
