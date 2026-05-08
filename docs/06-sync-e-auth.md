@@ -1,6 +1,8 @@
 # Sync e autenticação
 
 > Saída do modelo "single-user, 100% offline" pro modelo "single-user, offline-first com backup/sync na nuvem".
+>
+> **Status: implementado em 2026-05-08.** Esse doc descreve o plano da arquitetura. Pra estado atual e detalhes operacionais, veja [`07-estado-atual.md`](07-estado-atual.md).
 
 ## Por quê
 

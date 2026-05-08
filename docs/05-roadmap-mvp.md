@@ -57,32 +57,48 @@ Objetivo: app rodando no celular do usuário, com checklist diário funcional, c
 - [x] Tela de Reativação (acionada após 2 dias pulados, bloqueante)
 - [x] Pausar áreas opcionais com alertas (modal de dupla confirmação no onboarding)
 - [ ] Cobrança por área: detecta área travada e oferece reduzir alvo OU manter
-- [ ] Tela de configurações: editar tarefas, mudar pesos, ver eventos
-- [ ] Build local no celular (Expo Go ou EAS dev build)
-- [ ] Polish: ícones de áreas, transições, micro-interações
+- [x] Tela de configurações: editar tarefas (CRUD via /tarefa/[id]), ver áreas, sair, apagar conta
+- [x] Build local no celular (Expo Go ou EAS dev build) — rodando no Simulator iOS via `expo run:ios`
+- [x] Polish: ícones (Ionicons na tab bar e em Configurações), transições padrão de stack
 
 ---
 
 ## Estado real (instantâneo)
 
-Bundles **iOS** e **Android** compilam sem erros. TypeScript limpo. O fluxo completo cadastro → autoavaliação → dashboard → checklist → alvo → reflexão → reativação está navegável.
+**MVP entregue + extras significativos.** O escopo original de 4 semanas foi cumprido e expandido. Veja `07-estado-atual.md` pra snapshot completo.
 
-Falta principalmente: testar no device real, tela de configurações pra editar tarefas, e polimento visual.
+Itens que extrapolaram o MVP original:
+- ✅ Login com Google (originalmente fora do escopo — era "single-user, sem login")
+- ✅ Backend próprio (Bun + Hono + Drizzle) hospedado no Railway
+- ✅ Sync app ↔ nuvem (pull/push + last-write-wins)
+- ✅ Tab bar inferior (4 abas) com Insights novo (gráfico do mês + calendário + top/bottom)
+- ✅ CRUD de tarefa com horário
+- ✅ Notificações disparadas no horário de cada tarefa
+- ✅ Detalhe do dia com edição retroativa (até 48h)
+- ✅ Detalhe da área com gráfico próprio
+
+---
+
+## Pendências conhecidas
+
+- Apple Sign-In (depende da Apple Developer Account ativar)
+- Editar cadastro (botão tem placeholder "Em breve")
+- Toggles de notificação não persistem (são visuais)
+- Sync do cadastro local com a nuvem
+- Splash screen e ícone do app personalizados
+- Padrões em Insights ("você falha mais às terças") — texto estático/placeholder
 
 ---
 
 ## Fora do MVP (v2+)
 
-- Backup/exportação dos dados
-- Sincronização entre dispositivos
-- Integração com WhatsApp
 - Coaches digitais com IA
-- Análise de padrões via LLM
-- Gamificação (badges, conquistas além de streaks)
+- Integração com WhatsApp
 - Modo casal (tarefas em comum)
-- Widget de tela inicial
+- Widget de tela inicial iOS
 - Apple Health / Google Fit
 - Versão web do dashboard
+- Justificativa opcional ao marcar tarefa como "não feito"
 
 ---
 
@@ -94,4 +110,4 @@ A cada sexta:
 - O que mudou no escopo
 - Decisão: seguir o plano ou ajustar
 
-Sem cerimônia — você pode até registrar como reflexão dentro do próprio app quando ele estiver rodando.
+Sem cerimônia — registre como reflexão dentro do próprio app.
