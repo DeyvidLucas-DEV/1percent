@@ -34,6 +34,23 @@ export async function execucoesDoDia(data: string = hojeIso()): Promise<Execucao
   );
 }
 
+export type StatusVisualTarefa = 'open' | 'done' | 'half' | 'fail';
+export type TarefaComExecucao = Tarefa & { status: StatusVisualTarefa };
+
+const STATUS_MAP: Record<StatusExecucao, StatusVisualTarefa> = {
+  concluido: 'done',
+  parcial: 'half',
+  nao_feito: 'fail',
+};
+
+export async function listarExecucoesDoDia(data: string = hojeIso()): Promise<TarefaComExecucao[]> {
+  const tarefas = await listarTarefasAtivas();
+  const execs = await execucoesDoDia(data);
+  const byTarefa = new Map<number, StatusExecucao>();
+  for (const e of execs) byTarefa.set(e.tarefa_id, e.status);
+  return tarefas.map(t => ({ ...t, status: byTarefa.has(t.id) ? STATUS_MAP[byTarefa.get(t.id)!] : 'open' }));
+}
+
 export async function marcarExecucao(
   tarefaId: number,
   status: StatusExecucao,

@@ -1,18 +1,18 @@
 export type FaixaCor = 'marrom' | 'vermelho' | 'amarelo' | 'verde' | 'azul';
 
 export const CORES: Record<FaixaCor, string> = {
-  marrom:   '#6B4423',
-  vermelho: '#C0392B',
-  amarelo:  '#E1A93B',
+  marrom:   '#6B4F2A',
+  vermelho: '#B5391C',
+  amarelo:  '#C7A52E',
   verde:    '#2E8B57',
   azul:     '#1F6FB2',
 };
 
 export const ROTULOS: Record<FaixaCor, string> = {
-  marrom:   'Crítico',
-  vermelho: 'Baixo',
-  amarelo:  'Oscilando',
-  verde:    'Consistente',
+  marrom:   'Estagnação',
+  vermelho: 'Reação',
+  amarelo:  'Movimento',
+  verde:    'Construção',
   azul:     'Excelência',
 };
 

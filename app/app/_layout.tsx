@@ -49,7 +49,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ title: 'Hoje' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding/cadastro" options={{ title: 'Cadastro', headerBackVisible: false }} />
           <Stack.Screen name="onboarding/areas" options={{ title: 'Suas áreas' }} />
           <Stack.Screen name="onboarding/autoavaliacao" options={{ title: 'Onde você está' }} />
