@@ -1,17 +1,53 @@
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ScrollView, View, Text, StyleSheet, Alert } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tema } from '../../src/lib/tema';
 import { PageHeader } from '../../src/components/ui/PageHeader';
-import { limparSessao } from '../../src/auth/sessao';
+import { ConfigGroup } from '../../src/components/ui/ConfigGroup';
+import { ConfigRow } from '../../src/components/ui/ConfigRow';
 import { useAppStore } from '../../src/store/appStore';
+import { limparSessao } from '../../src/auth/sessao';
+import { api } from '../../src/lib/api';
+import { getUser } from '../../src/db/queries/users';
+import { listarAreas } from '../../src/db/queries/areas';
+import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
+import type { User, Area, Tarefa } from '../../src/db/types';
+
+const APP_VERSION = '1.0.0';
 
 export default function Config() {
   const router = useRouter();
   const setLogado = useAppStore(s => s.setLogado);
+  const [user, setUser] = useState<User | null>(null);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+  const [notif, setNotif] = useState({
+    manha: true,
+    noite: true,
+    atrasadas: true,
+    mediocridade: true,
+  });
 
-  async function sair() {
-    Alert.alert('Sair', 'Você vai precisar logar novamente nesse aparelho.', [
+  const carregar = useCallback(async () => {
+    const [u, a, t] = await Promise.all([
+      getUser(),
+      listarAreas(true),
+      listarTarefasAtivas(),
+    ]);
+    setUser(u);
+    setAreas(a);
+    setTarefas(t);
+  }, []);
+
+  useFocusEffect(useCallback(() => { carregar(); }, [carregar]));
+
+  function tarefasCount(areaId: number): number {
+    return tarefas.filter(t => t.area_id === areaId).length;
+  }
+
+  function sair() {
+    Alert.alert('Sair', 'Você vai precisar logar novamente nesse aparelho. Os dados locais permanecem.', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Sair',
@@ -25,30 +61,100 @@ export default function Config() {
     ]);
   }
 
+  function apagarConta() {
+    Alert.alert(
+      'Apagar conta',
+      'Isso apaga TODOS os seus dados na nuvem. O dado local desse aparelho continua até você reinstalar o app. Sem volta.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Apagar mesmo',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.del('/me');
+              await limparSessao();
+              setLogado(null);
+              router.replace('/login');
+            } catch (e: any) {
+              Alert.alert('Erro', String(e?.message ?? e));
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <SafeAreaView style={styles.bg} edges={['top']}>
-      <PageHeader kicker="ajustes" title="Configurações" />
-      <View style={styles.miolo}>
-        <Text style={styles.placeholder}>Em construção. Próximo passo da reforma visual.</Text>
-        <Pressable style={styles.botaoSair} onPress={sair}>
-          <Text style={styles.botaoSairTxt}>Sair</Text>
-        </Pressable>
-      </View>
+      <ScrollView contentContainerStyle={styles.container}>
+        <PageHeader title="Configurações" />
+
+        <View style={{ height: 18 }} />
+
+        <ConfigGroup label="Conta">
+          <ConfigRow iconColor={tema.bgInput} title={user?.nome ?? '—'} />
+          <ConfigRow iconColor={tema.bgInput} title="Editar cadastro" onPress={() => Alert.alert('Em breve', 'Edição de cadastro chegará num próximo passo.')} />
+          <ConfigRow iconColor={tema.bgInput} title="Sair" danger onPress={sair} />
+          <ConfigRow iconColor={tema.bgInput} title="Apagar conta" danger isLast onPress={apagarConta} />
+        </ConfigGroup>
+
+        <ConfigGroup label="Áreas e tarefas">
+          {areas.map((a, i) => (
+            <ConfigRow
+              key={a.id}
+              iconColor={a.cor_base}
+              title={a.nome}
+              value={`${tarefasCount(a.id)} ${tarefasCount(a.id) === 1 ? 'tarefa' : 'tarefas'}`}
+              isLast={i === areas.length - 1}
+              onPress={() => router.push(`/area/${a.id}`)}
+            />
+          ))}
+        </ConfigGroup>
+
+        <ConfigGroup label="Notificações">
+          <ConfigRow
+            title="Lembrete 07:00 (manhã)"
+            toggle={notif.manha}
+            onToggle={v => setNotif({ ...notif, manha: v })}
+          />
+          <ConfigRow
+            title="Cobrança 21:30 (noite)"
+            toggle={notif.noite}
+            onToggle={v => setNotif({ ...notif, noite: v })}
+          />
+          <ConfigRow
+            title="Tarefas atrasadas"
+            toggle={notif.atrasadas}
+            onToggle={v => setNotif({ ...notif, atrasadas: v })}
+          />
+          <ConfigRow
+            title="Subida de mediocridade"
+            toggle={notif.mediocridade}
+            onToggle={v => setNotif({ ...notif, mediocridade: v })}
+            isLast
+          />
+        </ConfigGroup>
+
+        <ConfigGroup label="Sincronização">
+          <ConfigRow title="Última sync" value="—" />
+          <ConfigRow
+            title="Sincronizar agora"
+            onPress={() => Alert.alert('Em breve', 'Sync entre app e backend chegará num próximo passo.')}
+          />
+          <ConfigRow title="Status do backend" value="OK" isLast />
+        </ConfigGroup>
+
+        <ConfigGroup label="Sobre">
+          <ConfigRow title="Versão" value={APP_VERSION} />
+          <ConfigRow title="Repositório" value="github.com/DeyvidLucas-DEV/1percent" isLast />
+        </ConfigGroup>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: tema.bg },
-  miolo: { padding: 24 },
-  placeholder: { color: tema.textoFraco, fontSize: 14, lineHeight: 22, marginBottom: 32 },
-  botaoSair: {
-    alignSelf: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: tema.perigo,
-    borderRadius: 10,
-  },
-  botaoSairTxt: { color: tema.perigo, fontSize: 14, fontWeight: '600' },
+  container: { paddingBottom: 30 },
 });
