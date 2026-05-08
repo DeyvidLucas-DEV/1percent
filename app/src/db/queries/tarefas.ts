@@ -1,0 +1,82 @@
+import { getDb } from '../schema';
+import type { Tarefa, Execucao, StatusExecucao } from '../types';
+import { agoraIso, hojeIso } from '../../lib/datas';
+import { parseISO, getDay } from 'date-fns';
+
+export async function listarTarefasAtivas(): Promise<Tarefa[]> {
+  const db = await getDb();
+  return db.getAllAsync<Tarefa>(
+    `SELECT t.* FROM tarefas t
+     JOIN areas a ON a.id = t.area_id
+     WHERE t.ativa = 1 AND a.ativa = 1
+     ORDER BY a.ordem, t.peso DESC`
+  );
+}
+
+/**
+ * Tarefas que devem aparecer no checklist de uma data específica.
+ * - diárias: aparecem todo dia
+ * - semanais: aparecem todos os dias da semana até o alvo_count ser cumprido
+ * - mensais: aparecem todos os dias do mês até o alvo_count ser cumprido
+ */
+export async function tarefasDoDia(data: string = hojeIso()): Promise<Tarefa[]> {
+  const todas = await listarTarefasAtivas();
+  // Por simplicidade no MVP, mostramos todas as tarefas ativas. O usuário marca
+  // só o que se aplica. Filtragem mais inteligente vem em v2.
+  return todas;
+}
+
+export async function execucoesDoDia(data: string = hojeIso()): Promise<Execucao[]> {
+  const db = await getDb();
+  return db.getAllAsync<Execucao>(
+    `SELECT * FROM execucoes WHERE data = ?`,
+    [data]
+  );
+}
+
+export async function marcarExecucao(
+  tarefaId: number,
+  status: StatusExecucao,
+  data: string = hojeIso()
+): Promise<void> {
+  const db = await getDb();
+  const now = agoraIso();
+  await db.runAsync(
+    `INSERT INTO execucoes (tarefa_id, data, status, created_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(tarefa_id, data) DO UPDATE SET status = excluded.status`,
+    [tarefaId, data, status, now]
+  );
+}
+
+export async function removerExecucao(
+  tarefaId: number,
+  data: string = hojeIso()
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `DELETE FROM execucoes WHERE tarefa_id = ? AND data = ?`,
+    [tarefaId, data]
+  );
+}
+
+export async function criarTarefa(
+  areaId: number,
+  nome: string,
+  peso: 1 | 2 | 3,
+  frequencia: 'diaria' | 'semanal' | 'mensal',
+  alvoCount: number
+): Promise<number> {
+  const db = await getDb();
+  const r = await db.runAsync(
+    `INSERT INTO tarefas (area_id, nome, peso, frequencia, alvo_count, ativa, created_at)
+     VALUES (?, ?, ?, ?, ?, 1, ?)`,
+    [areaId, nome, peso, frequencia, alvoCount, agoraIso()]
+  );
+  return r.lastInsertRowId as number;
+}
+
+export async function inativarTarefa(tarefaId: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE tarefas SET ativa = 0 WHERE id = ?`, [tarefaId]);
+}

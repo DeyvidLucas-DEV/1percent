@@ -1,0 +1,26 @@
+export const tema = {
+  bg:        '#0E0F12',
+  bgCard:    '#1A1C21',
+  bgInput:   '#23262E',
+  borda:     '#2C2F38',
+  texto:     '#ECECEC',
+  textoFraco:'#9095A0',
+  acento:    '#1F6FB2',
+  perigo:    '#C0392B',
+  sucesso:   '#2E8B57',
+  alerta:    '#E1A93B',
+  espacamento: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  raio: 12,
+  fonte: {
+    titulo: 28,
+    subtitulo: 20,
+    corpo: 16,
+    pequeno: 13,
+  },
+};

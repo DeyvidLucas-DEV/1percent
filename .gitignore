@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local state
+.claude/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Google OAuth iOS plist (não é segredo, mas não precisa ir pro repo — Expo usa app.json)
+client_*.apps.googleusercontent.com.plist
+GoogleService-Info.plist
