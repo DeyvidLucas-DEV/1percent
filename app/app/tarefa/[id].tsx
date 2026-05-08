@@ -12,6 +12,7 @@ import {
   reativarTarefa,
 } from '../../src/db/queries/tarefas';
 import { buscarAreaPorId } from '../../src/db/queries/areas';
+import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
 import type { Frequencia, Tarefa, Area } from '../../src/db/types';
 
 const PESO_OPCOES: { valor: 1 | 2 | 3; label: string }[] = [
@@ -91,6 +92,8 @@ export default function EditorTarefa() {
       } else if (tarefaId) {
         await atualizarTarefa(tarefaId, { nome: nome.trim(), peso, frequencia, alvoCount: alvo, horario: horarioFinal });
       }
+      // reagenda push locais (best-effort, não bloqueia)
+      reagendarTudo().catch(err => console.warn('[notif] reagendar falhou:', err));
       router.back();
     } catch (e: any) {
       Alert.alert('Erro', String(e?.message ?? e));
@@ -111,6 +114,7 @@ export default function EditorTarefa() {
           style: 'destructive',
           onPress: async () => {
             await inativarTarefa(tarefaId);
+            reagendarTudo().catch(err => console.warn('[notif] reagendar falhou:', err));
             router.back();
           },
         },
@@ -122,6 +126,7 @@ export default function EditorTarefa() {
     if (!tarefaId) return;
     await reativarTarefa(tarefaId);
     setTarefa(prev => (prev ? { ...prev, ativa: 1 } : prev));
+    reagendarTudo().catch(err => console.warn('[notif] reagendar falhou:', err));
   }
 
   return (

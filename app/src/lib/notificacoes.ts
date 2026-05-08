@@ -55,6 +55,41 @@ export async function agendarLembretesDiarios(): Promise<void> {
   });
 }
 
+export type TarefaParaNotificar = {
+  id: number;
+  nome: string;
+  horario: string; // "HH:MM"
+  areaNome: string;
+};
+
+/**
+ * Agenda 1 notificação diária por tarefa com horário definido.
+ * Cancela TUDO antes (lembretes diários + tarefas) e reagenda do zero —
+ * fluxo idempotente, sem precisar guardar mapping.
+ */
+export async function reagendarNotificacoesDeTarefas(tarefas: TarefaParaNotificar[]): Promise<void> {
+  // Manda cancelar tudo e reagendar lembretes fixos
+  await agendarLembretesDiarios();
+
+  for (const t of tarefas) {
+    const [h, m] = t.horario.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) continue;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: t.nome,
+        body: `${t.areaNome} — agora`,
+        data: { tarefaId: t.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        hour: h,
+        minute: m,
+        repeats: true,
+      } as any,
+    });
+  }
+}
+
 export async function notificarPosPulo(): Promise<void> {
   await Notifications.scheduleNotificationAsync({
     content: {
