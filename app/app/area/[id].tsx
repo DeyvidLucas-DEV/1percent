@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, RefreshControl } from 'react-native';
-import { useLocalSearchParams, useFocusEffect, Stack } from 'expo-router';
+import { ScrollView, View, Text, StyleSheet, RefreshControl, Pressable } from 'react-native';
+import { useLocalSearchParams, useFocusEffect, Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tema } from '../../src/lib/tema';
 import { BigRing } from '../../src/components/ui/BigRing';
@@ -24,6 +24,7 @@ function freqTexto(t: TarefaComExecucao): string {
 }
 
 export default function DetalheArea() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const areaId = Number(id);
   const [area, setArea] = useState<Area | null>(null);
@@ -85,7 +86,12 @@ export default function DetalheArea() {
             />
           </View>
 
-          <Text style={styles.secao}>TAREFAS</Text>
+          <View style={styles.secaoRow}>
+            <Text style={styles.secao}>TAREFAS</Text>
+            <Pressable onPress={() => router.push(`/tarefa/novo?area=${areaId}`)}>
+              <Text style={styles.adicionar}>+ Nova</Text>
+            </Pressable>
+          </View>
           <View style={styles.lista}>
             {tarefas.length === 0 && (
               <View style={{ padding: 24 }}>
@@ -99,8 +105,10 @@ export default function DetalheArea() {
                 key={t.id}
                 status={t.status}
                 title={t.nome}
+                time={t.horario ?? undefined}
                 weight={t.peso}
                 isLast={i === tarefas.length - 1}
+                onPress={() => router.push(`/tarefa/${t.id}`)}
               />
             ))}
           </View>
@@ -142,14 +150,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 22,
   },
-  secao: {
+  secaoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
     marginBottom: 8,
+  },
+  secao: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.2,
     color: tema.textoFraco,
   },
+  adicionar: { color: tema.acento, fontSize: 14, fontWeight: '600' },
   lista: {
     marginHorizontal: 16,
     marginBottom: 12,

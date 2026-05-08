@@ -77,23 +77,51 @@ export async function removerExecucao(
   );
 }
 
-export async function criarTarefa(
-  areaId: number,
-  nome: string,
-  peso: 1 | 2 | 3,
-  frequencia: 'diaria' | 'semanal' | 'mensal',
-  alvoCount: number
-): Promise<number> {
+export async function criarTarefa(dados: {
+  areaId: number;
+  nome: string;
+  peso: 1 | 2 | 3;
+  frequencia: 'diaria' | 'semanal' | 'mensal';
+  alvoCount: number;
+  horario: string | null;
+}): Promise<number> {
   const db = await getDb();
   const r = await db.runAsync(
-    `INSERT INTO tarefas (area_id, nome, peso, frequencia, alvo_count, ativa, created_at)
-     VALUES (?, ?, ?, ?, ?, 1, ?)`,
-    [areaId, nome, peso, frequencia, alvoCount, agoraIso()]
+    `INSERT INTO tarefas (area_id, nome, peso, frequencia, alvo_count, ativa, created_at, horario)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+    [dados.areaId, dados.nome, dados.peso, dados.frequencia, dados.alvoCount, agoraIso(), dados.horario]
   );
   return r.lastInsertRowId as number;
+}
+
+export async function buscarTarefaPorId(id: number): Promise<Tarefa | null> {
+  const db = await getDb();
+  const r = await db.getFirstAsync<Tarefa>(`SELECT * FROM tarefas WHERE id = ?`, [id]);
+  return r ?? null;
+}
+
+export async function atualizarTarefa(id: number, dados: {
+  nome: string;
+  peso: 1 | 2 | 3;
+  frequencia: 'diaria' | 'semanal' | 'mensal';
+  alvoCount: number;
+  horario: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE tarefas
+     SET nome = ?, peso = ?, frequencia = ?, alvo_count = ?, horario = ?
+     WHERE id = ?`,
+    [dados.nome, dados.peso, dados.frequencia, dados.alvoCount, dados.horario, id]
+  );
 }
 
 export async function inativarTarefa(tarefaId: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(`UPDATE tarefas SET ativa = 0 WHERE id = ?`, [tarefaId]);
+}
+
+export async function reativarTarefa(tarefaId: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE tarefas SET ativa = 1 WHERE id = ?`, [tarefaId]);
 }
