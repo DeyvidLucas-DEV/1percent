@@ -1,9 +1,14 @@
 import { View, Text, Pressable, Switch, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { tema } from '../../lib/tema';
 
 type Props = {
-  iconColor?: string;
+  /** Nome do Ionicon (ex: 'log-out-outline'). Mutuamente exclusivo com `colorBox`. */
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string; // cor do icon (default: textoFraco)
+  /** Quadradinho colorido usado em listas de áreas (cor da área). */
+  colorBox?: string;
   title: string;
   value?: string;
   danger?: boolean;
@@ -14,7 +19,9 @@ type Props = {
 };
 
 export function ConfigRow({
+  icon,
   iconColor,
+  colorBox,
   title,
   value,
   danger,
@@ -30,10 +37,19 @@ export function ConfigRow({
       style={({ pressed }: { pressed?: boolean } = {}) => [
         styles.linha,
         !isLast && styles.divisor,
-        pressed && { opacity: 0.6 },
+        pressed && { opacity: 0.55 },
       ]}
     >
-      {iconColor && <View style={[styles.icone, { backgroundColor: iconColor }]} />}
+      {colorBox && <View style={[styles.colorBox, { backgroundColor: colorBox }]} />}
+      {icon && (
+        <View style={styles.iconWrap}>
+          <Ionicons
+            name={icon}
+            size={20}
+            color={danger ? tema.perigo : (iconColor ?? tema.textoFraco)}
+          />
+        </View>
+      )}
       <Text style={[styles.titulo, danger && { color: tema.perigo }]} numberOfLines={1}>
         {title}
       </Text>
@@ -76,7 +92,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: tema.borda,
   },
-  icone: { width: 28, height: 28, borderRadius: 7 },
+  colorBox: { width: 24, height: 24, borderRadius: 6 },
+  iconWrap: { width: 24, alignItems: 'center', justifyContent: 'center' },
   titulo: { flex: 1, color: tema.texto, fontSize: 15, fontWeight: '500' },
   value: { color: tema.textoFraco, fontSize: 14 },
 });

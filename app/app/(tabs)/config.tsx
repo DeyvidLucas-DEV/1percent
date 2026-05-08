@@ -110,17 +110,17 @@ export default function Config() {
         <View style={{ height: 18 }} />
 
         <ConfigGroup label="Conta">
-          <ConfigRow iconColor={tema.bgInput} title={user?.nome ?? '—'} />
-          <ConfigRow iconColor={tema.bgInput} title="Editar cadastro" onPress={() => Alert.alert('Em breve', 'Edição de cadastro chegará num próximo passo.')} />
-          <ConfigRow iconColor={tema.bgInput} title="Sair" danger onPress={sair} />
-          <ConfigRow iconColor={tema.bgInput} title="Apagar conta" danger isLast onPress={apagarConta} />
+          <ConfigRow icon="person-outline" title={user?.nome ?? '—'} />
+          <ConfigRow icon="create-outline" title="Editar cadastro" onPress={() => Alert.alert('Em breve', 'Edição de cadastro chegará num próximo passo.')} />
+          <ConfigRow icon="log-out-outline" title="Sair" danger onPress={sair} />
+          <ConfigRow icon="trash-outline" title="Apagar conta" danger isLast onPress={apagarConta} />
         </ConfigGroup>
 
         <ConfigGroup label="Áreas e tarefas">
           {areas.map((a, i) => (
             <ConfigRow
               key={a.id}
-              iconColor={a.cor_base}
+              colorBox={a.cor_base}
               title={a.nome}
               value={`${tarefasCount(a.id)} ${tarefasCount(a.id) === 1 ? 'tarefa' : 'tarefas'}`}
               isLast={i === areas.length - 1}
@@ -131,21 +131,25 @@ export default function Config() {
 
         <ConfigGroup label="Notificações">
           <ConfigRow
+            icon="sunny-outline"
             title="Lembrete 07:00 (manhã)"
             toggle={notif.manha}
             onToggle={v => setNotif({ ...notif, manha: v })}
           />
           <ConfigRow
+            icon="moon-outline"
             title="Cobrança 21:30 (noite)"
             toggle={notif.noite}
             onToggle={v => setNotif({ ...notif, noite: v })}
           />
           <ConfigRow
+            icon="alarm-outline"
             title="Tarefas atrasadas"
             toggle={notif.atrasadas}
             onToggle={v => setNotif({ ...notif, atrasadas: v })}
           />
           <ConfigRow
+            icon="warning-outline"
             title="Subida de mediocridade"
             toggle={notif.mediocridade}
             onToggle={v => setNotif({ ...notif, mediocridade: v })}
@@ -154,8 +158,9 @@ export default function Config() {
         </ConfigGroup>
 
         <ConfigGroup label="Sincronização">
-          <ConfigRow title="Última sync" value={formatarUltimaSync(lastPull)} />
+          <ConfigRow icon="cloud-done-outline" title="Última sync" value={formatarUltimaSync(lastPull)} />
           <ConfigRow
+            icon="sync-outline"
             title={sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
             onPress={async () => {
               if (sincronizando) return;
@@ -175,8 +180,8 @@ export default function Config() {
         </ConfigGroup>
 
         <ConfigGroup label="Sobre">
-          <ConfigRow title="Versão" value={APP_VERSION} />
-          <ConfigRow title="Repositório" value="github.com/DeyvidLucas-DEV/1percent" isLast />
+          <ConfigRow icon="information-circle-outline" title="Versão" value={APP_VERSION} />
+          <ConfigRow icon="logo-github" title="Repositório" value="DeyvidLucas-DEV/1percent" isLast />
         </ConfigGroup>
       </ScrollView>
     </SafeAreaView>
