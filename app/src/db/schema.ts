@@ -87,9 +87,60 @@ CREATE TABLE IF NOT EXISTS eventos (
   payload_json    TEXT,
   created_at      TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sync_state (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  last_pull_at    TEXT
+);
+INSERT OR IGNORE INTO sync_state (id, last_pull_at) VALUES (1, NULL);
 `;
+
+const TABELAS_SYNC = ['areas', 'tarefas', 'execucoes', 'reflexoes_diarias', 'autoavaliacao_inicial', 'eventos'] as const;
+
+async function colunaExiste(db: Db, tabela: string, coluna: string): Promise<boolean> {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tabela})`);
+  return rows.some(r => r.name === coluna);
+}
+
+async function rodarMigracoes(db: Db): Promise<void> {
+  for (const t of TABELAS_SYNC) {
+    if (!(await colunaExiste(db, t, 'updated_at'))) {
+      await db.execAsync(`ALTER TABLE ${t} ADD COLUMN updated_at TEXT`);
+      await db.execAsync(`UPDATE ${t} SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL`);
+    }
+    if (!(await colunaExiste(db, t, 'synced_at'))) {
+      await db.execAsync(`ALTER TABLE ${t} ADD COLUMN synced_at TEXT`);
+    }
+  }
+
+  // Triggers que mantêm updated_at em dia automaticamente.
+  // - INSERT: se a linha entrou sem updated_at, preenche agora.
+  // - UPDATE: se ninguém mudou updated_at na operação, preenche.
+  // O `IS` lida com NULL corretamente (= não compara NULL).
+  for (const t of TABELAS_SYNC) {
+    await db.execAsync(`
+      CREATE TRIGGER IF NOT EXISTS ${t}_updated_at_ins
+      AFTER INSERT ON ${t}
+      FOR EACH ROW
+      WHEN NEW.updated_at IS NULL
+      BEGIN
+        UPDATE ${t} SET updated_at = datetime('now') WHERE rowid = NEW.rowid;
+      END;
+    `);
+    await db.execAsync(`
+      CREATE TRIGGER IF NOT EXISTS ${t}_updated_at_upd
+      AFTER UPDATE ON ${t}
+      FOR EACH ROW
+      WHEN OLD.updated_at IS NEW.updated_at
+      BEGIN
+        UPDATE ${t} SET updated_at = datetime('now') WHERE rowid = NEW.rowid;
+      END;
+    `);
+  }
+}
 
 export async function initSchema(): Promise<void> {
   const db = await getDb();
   await db.execAsync(SCHEMA_SQL);
+  await rodarMigracoes(db);
 }

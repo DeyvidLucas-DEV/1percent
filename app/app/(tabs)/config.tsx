@@ -12,9 +12,22 @@ import { api } from '../../src/lib/api';
 import { getUser } from '../../src/db/queries/users';
 import { listarAreas } from '../../src/db/queries/areas';
 import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
+import { getLastPullAt } from '../../src/db/queries/syncState';
+import { sincronizar } from '../../src/sync/sync';
 import type { User, Area, Tarefa } from '../../src/db/types';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const APP_VERSION = '1.0.0';
+
+function formatarUltimaSync(iso: string | null): string {
+  if (!iso) return 'nunca';
+  try {
+    return `há ${formatDistanceToNow(parseISO(iso), { locale: ptBR })}`;
+  } catch {
+    return iso;
+  }
+}
 
 export default function Config() {
   const router = useRouter();
@@ -22,6 +35,8 @@ export default function Config() {
   const [user, setUser] = useState<User | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+  const [lastPull, setLastPull] = useState<string | null>(null);
+  const [sincronizando, setSincronizando] = useState(false);
   const [notif, setNotif] = useState({
     manha: true,
     noite: true,
@@ -30,14 +45,16 @@ export default function Config() {
   });
 
   const carregar = useCallback(async () => {
-    const [u, a, t] = await Promise.all([
+    const [u, a, t, lp] = await Promise.all([
       getUser(),
       listarAreas(true),
       listarTarefasAtivas(),
+      getLastPullAt(),
     ]);
     setUser(u);
     setAreas(a);
     setTarefas(t);
+    setLastPull(lp);
   }, []);
 
   useFocusEffect(useCallback(() => { carregar(); }, [carregar]));
@@ -137,12 +154,24 @@ export default function Config() {
         </ConfigGroup>
 
         <ConfigGroup label="Sincronização">
-          <ConfigRow title="Última sync" value="—" />
+          <ConfigRow title="Última sync" value={formatarUltimaSync(lastPull)} />
           <ConfigRow
-            title="Sincronizar agora"
-            onPress={() => Alert.alert('Em breve', 'Sync entre app e backend chegará num próximo passo.')}
+            title={sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
+            onPress={async () => {
+              if (sincronizando) return;
+              setSincronizando(true);
+              try {
+                const r = await sincronizar();
+                await carregar();
+                Alert.alert('Sync OK', `${r.enviados} enviados · ${r.puxados} puxados`);
+              } catch (e: any) {
+                Alert.alert('Erro de sync', String(e?.message ?? e));
+              } finally {
+                setSincronizando(false);
+              }
+            }}
+            isLast
           />
-          <ConfigRow title="Status do backend" value="OK" isLast />
         </ConfigGroup>
 
         <ConfigGroup label="Sobre">
