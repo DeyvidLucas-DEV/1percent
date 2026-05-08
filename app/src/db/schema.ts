@@ -113,6 +113,11 @@ async function rodarMigracoes(db: Db): Promise<void> {
     }
   }
 
+  // Horario por tarefa (HH:MM). NULL = sem horario fixo.
+  if (!(await colunaExiste(db, 'tarefas', 'horario'))) {
+    await db.execAsync(`ALTER TABLE tarefas ADD COLUMN horario TEXT`);
+  }
+
   // Triggers que mantêm updated_at em dia automaticamente.
   // - INSERT: se a linha entrou sem updated_at, preenche agora.
   // - UPDATE: se ninguém mudou updated_at na operação, preenche.

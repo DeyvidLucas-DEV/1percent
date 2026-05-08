@@ -29,6 +29,7 @@ type TarefaRemota = {
   frequencia: string;
   alvoCount: number;
   ativa: number;
+  horario: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -145,8 +146,8 @@ async function aplicarPull(resp: PullResponse): Promise<number> {
       'id = ?',
       [t.id],
       t.updatedAt,
-      `INSERT INTO tarefas (id, area_id, nome, peso, frequencia, alvo_count, ativa, created_at, updated_at, synced_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)
+      `INSERT INTO tarefas (id, area_id, nome, peso, frequencia, alvo_count, ativa, horario, created_at, updated_at, synced_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          area_id = excluded.area_id,
          nome = excluded.nome,
@@ -154,9 +155,10 @@ async function aplicarPull(resp: PullResponse): Promise<number> {
          frequencia = excluded.frequencia,
          alvo_count = excluded.alvo_count,
          ativa = excluded.ativa,
+         horario = excluded.horario,
          updated_at = excluded.updated_at,
          synced_at = excluded.synced_at`,
-      [t.id, t.areaId, t.nome, t.peso, t.frequencia, t.alvoCount, t.ativa, t.createdAt, t.updatedAt, t.updatedAt]
+      [t.id, t.areaId, t.nome, t.peso, t.frequencia, t.alvoCount, t.ativa, t.horario, t.createdAt, t.updatedAt, t.updatedAt]
     );
     if (ok) n++;
   }
@@ -271,7 +273,8 @@ async function coletarMudancas(): Promise<{ corpo: any; meta: { tabela: string; 
 
   const tarefas = await linhasNaoSincronizadas<{
     id: number; area_id: number; nome: string; peso: number; frequencia: string;
-    alvo_count: number; ativa: number; created_at: string; updated_at: string;
+    alvo_count: number; ativa: number; horario: string | null;
+    created_at: string; updated_at: string;
   }>('tarefas');
 
   const execucoes = await linhasNaoSincronizadas<{

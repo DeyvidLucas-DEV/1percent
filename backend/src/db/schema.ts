@@ -61,6 +61,7 @@ export const tarefas = pgTable(
     frequencia: text('frequencia').notNull(),
     alvoCount: integer('alvo_count').notNull(),
     ativa: smallint('ativa').notNull(),
+    horario: text('horario'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

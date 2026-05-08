@@ -62,6 +62,16 @@ export default function Hoje() {
   const corDaArea = new Map<number, string>();
   for (const a of data.porArea) corDaArea.set(a.area.id, a.area.cor_base);
 
+  // Ordena tarefas: com horário primeiro (em ordem cronológica), sem horário no fim
+  const agora = new Date();
+  const horaAgora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+  const tarefasOrdenadas = [...tarefas].sort((a, b) => {
+    if (a.horario && b.horario) return a.horario.localeCompare(b.horario);
+    if (a.horario) return -1;
+    if (b.horario) return 1;
+    return 0;
+  });
+
   return (
     <SafeAreaView style={styles.bg} edges={['top']}>
       <ScrollView
@@ -100,17 +110,22 @@ export default function Hoje() {
               <Text style={{ color: tema.textoFraco, fontSize: 14 }}>Sem tarefas pra hoje.</Text>
             </View>
           )}
-          {tarefas.map((t, i) => (
-            <TaskRow
-              key={t.id}
-              status={t.status}
-              title={t.nome}
-              areaColor={corDaArea.get(t.area_id)}
-              weight={t.peso}
-              isLast={i === tarefas.length - 1}
-              onPress={() => router.push('/checklist')}
-            />
-          ))}
+          {tarefasOrdenadas.map((t, i) => {
+            const atrasada = !!t.horario && t.status !== 'done' && t.horario < horaAgora;
+            return (
+              <TaskRow
+                key={t.id}
+                status={t.status}
+                title={t.nome}
+                time={t.horario ?? undefined}
+                areaColor={corDaArea.get(t.area_id)}
+                weight={t.peso}
+                late={atrasada}
+                isLast={i === tarefasOrdenadas.length - 1}
+                onPress={() => router.push('/checklist')}
+              />
+            );
+          })}
         </View>
 
         <Pressable style={styles.botaoReflexao} onPress={() => router.push('/reflexao')}>

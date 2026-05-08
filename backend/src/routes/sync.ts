@@ -67,6 +67,7 @@ const pushBody = z.object({
     frequencia: z.string(),
     alvo_count: z.number().int(),
     ativa: z.number().int(),
+    horario: z.string().nullable().optional(),
     created_at: z.string(),
   })).optional(),
   execucoes: z.array(linhaBase.extend({
@@ -152,6 +153,7 @@ syncRoutes.post('/push', async (c) => {
             frequencia: t.frequencia,
             alvoCount: t.alvo_count,
             ativa: t.ativa,
+            horario: t.horario ?? null,
             createdAt: new Date(t.created_at),
             updatedAt: new Date(t.updated_at),
           })
@@ -164,6 +166,7 @@ syncRoutes.post('/push', async (c) => {
               frequencia: t.frequencia,
               alvoCount: t.alvo_count,
               ativa: t.ativa,
+              horario: t.horario ?? null,
               updatedAt: new Date(t.updated_at),
             },
             setWhere: sql`${tarefas.updatedAt} < ${new Date(t.updated_at)}`,

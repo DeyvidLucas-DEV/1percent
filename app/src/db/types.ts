@@ -24,6 +24,7 @@ export type Tarefa = {
   alvo_count: number;
   ativa: 0 | 1;
   created_at: string;
+  horario: string | null;
 };
 
 export type Execucao = {
