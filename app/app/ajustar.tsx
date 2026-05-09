@@ -22,6 +22,12 @@ const CARDS: Card[] = [
     destaque: true,
   },
   {
+    titulo: 'Plano da semana',
+    subtitulo: 'IA cruza 7 dias, fatos e o que você aceitou. Propõe a próxima semana.',
+    icone: 'calendar-outline',
+    rota: '/ajustar/plano',
+  },
+  {
     titulo: 'O que o 1% aprendeu',
     subtitulo: 'Padrões e fatos sobre sua rotina. Edite ou apague o que não bate.',
     icone: 'library-outline',
