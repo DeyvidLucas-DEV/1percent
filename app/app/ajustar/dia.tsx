@@ -1,0 +1,439 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { useRouter, Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { tema } from '../../src/lib/tema';
+import { PageHeader } from '../../src/components/ui/PageHeader';
+import { api, ApiError } from '../../src/lib/api';
+import { carregarDashboard } from '../../src/domain/agregados';
+import { inserirEvento } from '../../src/db/queries/trailEvents';
+
+type Recomendacao = {
+  id: string;
+  tipo: 'plano_minimo' | 'mudar_horario' | 'reduzir_carga' | 'priorizar_area';
+  descricao: string;
+  exigeConfirmacao: true;
+};
+
+type FatoCandidato = {
+  categoria: string;
+  chave: string;
+  valor: string;
+  confianca: 'baixa' | 'media' | 'alta';
+  deveConfirmarComUsuario: boolean;
+};
+
+type EventoClassificado = {
+  tipo: 'stressor_reported' | 'routine_pattern' | 'area_neglected' | 'preference_signal';
+  areaSlug: string | null;
+  descricao: string;
+  confianca: 'baixa' | 'media' | 'alta';
+};
+
+type RespostaDailyNote = {
+  eventId: string;
+  extracao: {
+    eventosClassificados: EventoClassificado[];
+    fatosCandidatos: FatoCandidato[];
+    episodio: { titulo: string; resumo: string; tags: string[]; areaSlugs: string[]; importanceScore: number } | null;
+    recomendacoesImediatas: Recomendacao[];
+  };
+  recomendacoes: Recomendacao[];
+};
+
+const TIPO_REC_LABEL: Record<Recomendacao['tipo'], string> = {
+  plano_minimo: 'Plano mínimo',
+  mudar_horario: 'Mudar horário',
+  reduzir_carga: 'Reduzir carga',
+  priorizar_area: 'Priorizar área',
+};
+
+const TIPO_EVT_LABEL: Record<EventoClassificado['tipo'], string> = {
+  stressor_reported: 'Estressor',
+  routine_pattern: 'Padrão de rotina',
+  area_neglected: 'Área negligenciada',
+  preference_signal: 'Sinal de preferência',
+};
+
+export default function ContarOdia() {
+  const router = useRouter();
+  const [texto, setTexto] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [resp, setResp] = useState<RespostaDailyNote | null>(null);
+  const [statusRec, setStatusRec] = useState<Record<string, 'pendente' | 'aceita' | 'recusada'>>({});
+  const [contexto, setContexto] = useState<{
+    percentualGeral7d: number;
+    areasNegligenciadas: string[];
+    areasFortes: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const d = await carregarDashboard();
+      if (!alive) return;
+      const ordenadas = [...d.porArea].sort((a, b) => a.percentual7d - b.percentual7d);
+      setContexto({
+        percentualGeral7d: d.percentualGeral,
+        areasNegligenciadas: ordenadas.slice(0, 3).map((a) => a.area.slug),
+        areasFortes: ordenadas.slice(-3).map((a) => a.area.slug).reverse(),
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const enviar = useCallback(async () => {
+    const t = texto.trim();
+    if (t.length < 20) {
+      Alert.alert('Texto curto', 'Escreva pelo menos algumas frases honestas.');
+      return;
+    }
+    setEnviando(true);
+    try {
+      const r = await api.post<RespostaDailyNote>('/ai/daily-note', {
+        relato: t,
+        contextoDados: contexto ?? undefined,
+      });
+      setResp(r);
+      const inicial: Record<string, 'pendente'> = {};
+      for (const rec of r.recomendacoes) inicial[rec.id] = 'pendente';
+      setStatusRec(inicial);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (e.status === 429 && p.error === 'rate_limited') {
+          const reset = new Date(String(p.resetEm)).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          Alert.alert('Limite atingido', `Você usou o máximo desta ${p.bucket}. Volta às ${reset}.`);
+        } else if (e.status === 502) {
+          Alert.alert('Falha na IA', 'Tente reformular o relato ou tente novamente em instantes.');
+        } else {
+          Alert.alert('Erro', `Algo deu errado (status ${e.status}).`);
+        }
+      } else {
+        Alert.alert('Sem conexão', 'O checklist continua. A análise da rota espera.');
+      }
+    } finally {
+      setEnviando(false);
+    }
+  }, [texto, contexto]);
+
+  const aceitarRec = useCallback(
+    async (rec: Recomendacao) => {
+      await inserirEvento({
+        tipo: 'suggestion_accepted',
+        source: 'app',
+        payload: {
+          recomendacaoId: rec.id,
+          tipo: rec.tipo,
+          descricao: rec.descricao,
+          fonteEventId: resp?.eventId,
+        },
+      });
+      setStatusRec((s) => ({ ...s, [rec.id]: 'aceita' }));
+    },
+    [resp]
+  );
+
+  const recusarRec = useCallback(
+    async (rec: Recomendacao) => {
+      await inserirEvento({
+        tipo: 'suggestion_rejected',
+        source: 'app',
+        payload: {
+          recomendacaoId: rec.id,
+          tipo: rec.tipo,
+          descricao: rec.descricao,
+          fonteEventId: resp?.eventId,
+        },
+      });
+      setStatusRec((s) => ({ ...s, [rec.id]: 'recusada' }));
+    },
+    [resp]
+  );
+
+  return (
+    <>
+      <Stack.Screen options={{ title: '' }} />
+      <SafeAreaView style={styles.bg} edges={['top']}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          <PageHeader kicker="AJUSTAR — DIÁRIO" title="Como foi seu dia" />
+          <Text style={styles.sub}>
+            Conte sem floreio. O que tentou, o que falhou, o que travou.
+          </Text>
+
+          {!resp && (
+            <>
+              <View style={styles.bloco}>
+                <TextInput
+                  style={styles.textarea}
+                  multiline
+                  placeholder="Ex: Cheguei tarde de novo, quando coloquei treino à noite eu desisti. Domingo funcionou. Família bem, mas tô deixando finanças pra depois há semanas..."
+                  placeholderTextColor={tema.textoFraco}
+                  value={texto}
+                  onChangeText={setTexto}
+                  textAlignVertical="top"
+                  editable={!enviando}
+                />
+                <Text style={styles.contador}>{texto.trim().length} caracteres</Text>
+              </View>
+
+              <Pressable
+                style={[styles.botao, enviando && { opacity: 0.6 }]}
+                onPress={enviar}
+                disabled={enviando}
+              >
+                {enviando ? (
+                  <ActivityIndicator color="#F5F1E5" />
+                ) : (
+                  <Text style={styles.botaoTxt}>Enviar</Text>
+                )}
+              </Pressable>
+              <Text style={styles.aviso}>
+                A IA não cria nem altera tarefa sem confirmação.
+              </Text>
+            </>
+          )}
+
+          {resp && (
+            <>
+              {resp.extracao.eventosClassificados.length > 0 && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>LEITURA DIRETA</Text>
+                  {resp.extracao.eventosClassificados.map((e, i) => (
+                    <View key={i} style={styles.evento}>
+                      <Text style={styles.eventoTipo}>
+                        {TIPO_EVT_LABEL[e.tipo]} · confiança {e.confianca}
+                      </Text>
+                      <Text style={styles.eventoDesc}>{e.descricao}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {resp.extracao.fatosCandidatos.length > 0 && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>FATOS APRENDIDOS</Text>
+                  {resp.extracao.fatosCandidatos.map((f, i) => (
+                    <View key={i} style={styles.fato}>
+                      <Text style={styles.fatoChave}>
+                        {f.categoria} · {f.chave}
+                      </Text>
+                      <Text style={styles.fatoValor}>{f.valor}</Text>
+                      <Text style={styles.fatoConf}>confiança {f.confianca}</Text>
+                    </View>
+                  ))}
+                  <Text style={styles.notaFato}>
+                    Você pode editar ou apagar em "O que o 1% aprendeu".
+                  </Text>
+                </View>
+              )}
+
+              {resp.extracao.episodio && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>EPISÓDIO</Text>
+                  <Text style={styles.episodioTitulo}>{resp.extracao.episodio.titulo}</Text>
+                  <Text style={styles.episodioResumo}>{resp.extracao.episodio.resumo}</Text>
+                </View>
+              )}
+
+              {resp.recomendacoes.length > 0 && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>AJUSTES SUGERIDOS</Text>
+                  {resp.recomendacoes.map((rec) => {
+                    const status = statusRec[rec.id] ?? 'pendente';
+                    return (
+                      <View key={rec.id} style={styles.recCard}>
+                        <Text style={styles.recTipo}>{TIPO_REC_LABEL[rec.tipo]}</Text>
+                        <Text style={styles.recDesc}>{rec.descricao}</Text>
+                        {status === 'pendente' && (
+                          <View style={styles.recBtns}>
+                            <Pressable
+                              style={[styles.btnSec, styles.btnRecusar]}
+                              onPress={() => recusarRec(rec)}
+                            >
+                              <Text style={styles.btnRecusarTxt}>Recusar</Text>
+                            </Pressable>
+                            <Pressable
+                              style={[styles.btnSec, styles.btnAceitar]}
+                              onPress={() => aceitarRec(rec)}
+                            >
+                              <Text style={styles.btnAceitarTxt}>Aceitar</Text>
+                            </Pressable>
+                          </View>
+                        )}
+                        {status === 'aceita' && (
+                          <Text style={styles.tagAceita}>Aceito.</Text>
+                        )}
+                        {status === 'recusada' && (
+                          <Text style={styles.tagRecusada}>Recusado.</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <Pressable style={styles.botaoVoltar} onPress={() => router.back()}>
+                <Text style={styles.botaoVoltarTxt}>Voltar</Text>
+              </Pressable>
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: tema.bg },
+  container: { paddingBottom: 80 },
+  sub: {
+    paddingHorizontal: 24,
+    color: tema.textoFraco,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  bloco: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: tema.bgCard,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  kicker: {
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 1.2,
+    color: tema.textoFraco,
+    marginBottom: 10,
+  },
+  textarea: {
+    minHeight: 200,
+    color: tema.texto,
+    fontSize: 16,
+    lineHeight: 22,
+    backgroundColor: tema.bgInput,
+    borderRadius: 12,
+    padding: 12,
+  },
+  contador: {
+    fontSize: 11,
+    color: tema.textoFraco,
+    marginTop: 6,
+    textAlign: 'right',
+  },
+  botao: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: tema.acento,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  botaoTxt: {
+    color: '#F5F1E5',
+    fontFamily: tema.fontFamily.textBold,
+    fontSize: 16,
+  },
+  aviso: {
+    paddingHorizontal: 24,
+    marginTop: 10,
+    fontSize: 12,
+    color: tema.textoFraco,
+    textAlign: 'center',
+  },
+  evento: { marginBottom: 8 },
+  eventoTipo: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  eventoDesc: { color: tema.texto, fontSize: 14, lineHeight: 19 },
+  fato: {
+    backgroundColor: tema.bg,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  fatoChave: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 0.6,
+  },
+  fatoValor: { color: tema.texto, fontSize: 14, lineHeight: 19, marginTop: 2 },
+  fatoConf: { color: tema.textoFraco, fontSize: 11, marginTop: 4 },
+  notaFato: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  episodioTitulo: {
+    color: tema.texto,
+    fontSize: 15,
+    fontFamily: tema.fontFamily.textBold,
+    marginBottom: 4,
+  },
+  episodioResumo: { color: tema.texto, fontSize: 14, lineHeight: 20 },
+  recCard: {
+    backgroundColor: tema.bg,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  recTipo: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  recDesc: { color: tema.texto, fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  recBtns: { flexDirection: 'row', gap: 8 },
+  btnSec: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  btnAceitar: { backgroundColor: tema.acento },
+  btnRecusar: { borderWidth: 1, borderColor: tema.bordaForte },
+  btnAceitarTxt: { color: '#F5F1E5', fontFamily: tema.fontFamily.textBold, fontSize: 14 },
+  btnRecusarTxt: { color: tema.texto, fontFamily: tema.fontFamily.textSemi, fontSize: 14 },
+  tagAceita: { color: tema.sucesso, fontSize: 12, fontFamily: tema.fontFamily.textBold },
+  tagRecusada: { color: tema.textoFraco, fontSize: 12 },
+  botaoVoltar: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  botaoVoltarTxt: {
+    color: tema.acento,
+    fontSize: 14,
+    fontFamily: tema.fontFamily.textSemi,
+  },
+});

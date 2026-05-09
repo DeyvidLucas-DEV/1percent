@@ -3,6 +3,18 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts as useBricolage,
+  BricolageGrotesque_500Medium,
+  BricolageGrotesque_700Bold,
+} from '@expo-google-fonts/bricolage-grotesque';
+import {
+  useFonts as useInter,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { bootstrap } from '../src/db/bootstrap';
 import { useAppStore } from '../src/store/appStore';
 import { tema } from '../src/lib/tema';
@@ -11,6 +23,12 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { inicializado, logado, onboarded, setInicializado, setLogado, setOnboarded } = useAppStore();
+
+  const [bricolageOk] = useBricolage({ BricolageGrotesque_500Medium, BricolageGrotesque_700Bold });
+  const [interOk] = useInter({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+  });
+  const fontesProntas = bricolageOk && interOk;
 
   useEffect(() => {
     (async () => {
@@ -36,10 +54,14 @@ export default function RootLayout() {
     }
   }, [inicializado, logado, onboarded, segments]);
 
+  if (!fontesProntas) {
+    return <GestureHandlerRootView style={{ flex: 1, backgroundColor: tema.bg }} />;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: tema.bg }}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: tema.bg },
@@ -60,6 +82,9 @@ export default function RootLayout() {
           <Stack.Screen name="tarefa/[id]" options={{ title: '' }} />
           <Stack.Screen name="dia/[iso]" options={{ title: '' }} />
           <Stack.Screen name="reflexao" options={{ title: 'Reflexão' }} />
+          <Stack.Screen name="ajustar" options={{ title: '' }} />
+          <Stack.Screen name="ajustar/dia" options={{ title: '' }} />
+          <Stack.Screen name="ajustar/memoria" options={{ title: '' }} />
           <Stack.Screen name="reativacao" options={{ title: 'Reativação', headerBackVisible: false }} />
         </Stack>
       </SafeAreaProvider>

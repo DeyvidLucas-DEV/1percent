@@ -8,6 +8,9 @@ import {
   timestamp,
   primaryKey,
   uniqueIndex,
+  index,
+  boolean,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -128,4 +131,72 @@ export const eventos = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.userId, t.id] }) })
+);
+
+// Trilha longitudinal do usuário (v3 §4.2). Append-only e idempotente por
+// (user_id, id UUID). NÃO usar last-write-wins — eventos não são editáveis.
+export const userTrailEvents = pgTable(
+  'user_trail_events',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    id: uuid('id').notNull(),
+    tipo: text('tipo').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    source: text('source').notNull(),
+    areaId: integer('area_id'),
+    tarefaId: integer('tarefa_id'),
+    sessionId: text('session_id'),
+    deviceId: text('device_id'),
+    payloadJson: jsonb('payload_json').notNull().default(sql`'{}'::jsonb`),
+    privacyLevel: text('privacy_level').notNull().default('private'),
+    schemaVersion: integer('schema_version').notNull().default(1),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.id] }),
+    idxUserTime: index('idx_trail_user_time').on(t.userId, t.occurredAt.desc()),
+    idxUserTipoTime: index('idx_trail_user_tipo_time').on(t.userId, t.tipo, t.occurredAt.desc()),
+  })
+);
+
+// Memória estruturada do usuário (v3 §4.3). Fatos estáveis e auditáveis.
+// Usuário pode editar/apagar (rota PATCH/DELETE /memory/facts/:id).
+export const userMemoryFacts = pgTable(
+  'user_memory_facts',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    id: uuid('id').notNull(),
+    categoria: text('categoria').notNull(),
+    chave: text('chave').notNull(),
+    valor: text('valor').notNull(),
+    confianca: text('confianca').notNull().default('media'),
+    origemEventId: uuid('origem_event_id'),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    lastConfirmedAt: timestamp('last_confirmed_at', { withTimezone: true }),
+    active: boolean('active').notNull().default(true),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.id] }),
+    uniqCategoriaChave: uniqueIndex('uniq_facts_user_categoria_chave').on(t.userId, t.categoria, t.chave),
+    idxUserCategoria: index('idx_facts_user_categoria').on(t.userId, t.categoria, t.active),
+  })
+);
+
+// Não sincronizada — controle de custo/abuso só faz sentido server-side.
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bucket: text('bucket').notNull(),
+    janelaInicio: timestamp('janela_inicio', { withTimezone: true }).notNull(),
+    contagem: integer('contagem').notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.bucket, t.janelaInicio] }) })
 );

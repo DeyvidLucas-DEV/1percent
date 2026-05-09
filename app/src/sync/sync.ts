@@ -1,6 +1,10 @@
 import { getDb } from '../db/schema';
 import { api } from '../lib/api';
 import { getLastPullAt, setLastPullAt } from '../db/queries/syncState';
+import {
+  listarEventosPendentes,
+  marcarSincronizados as marcarEventosSincronizados,
+} from '../db/queries/trailEvents';
 
 // Backend devolve campos em camelCase (Drizzle ORM); local SQLite usa snake_case.
 // Os tipos abaixo refletem o formato remoto.
@@ -326,11 +330,53 @@ async function enviarLocal(): Promise<number> {
   return total;
 }
 
+// ─── TRILHA ────────────────────────────────────────────────────────
+// Sync da trilha é separado do /sync/push porque os contratos são distintos:
+// - eventos têm UUID, são append-only e idempotentes (não usam updated_at).
+// - /sync/push valida com Zod estrito; trilha tem schema próprio.
+
+async function enviarTrilha(): Promise<number> {
+  const pendentes = await listarEventosPendentes(200);
+  if (pendentes.length === 0) return 0;
+
+  const corpo = {
+    eventos: pendentes.map((e) => ({
+      id: e.id,
+      tipo: e.tipo,
+      occurred_at: e.occurred_at,
+      source: e.source,
+      area_id: e.area_id,
+      tarefa_id: e.tarefa_id,
+      session_id: e.session_id,
+      device_id: e.device_id,
+      payload: safeParseJson(e.payload_json),
+      privacy_level: e.privacy_level,
+    })),
+  };
+
+  await api.post('/trail/batch', corpo);
+  await marcarEventosSincronizados(pendentes.map((e) => e.id));
+  return pendentes.length;
+}
+
+function safeParseJson(s: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(s);
+    return typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 // ─── ORQUESTRADOR ─────────────────────────────────────────────────
 
 export async function sincronizar(): Promise<ResultadoSync> {
   // Primeiro envia local pra cloud (caso a gente perca o pull, não perdemos dado).
   const enviados = await enviarLocal();
+  const eventosTrilha = await enviarTrilha().catch((e) => {
+    console.warn('[sync] falha ao enviar trilha (segue sync sem bloquear)', e);
+    return 0;
+  });
 
   // Depois puxa novidades.
   const since = await getLastPullAt();
@@ -339,5 +385,5 @@ export async function sincronizar(): Promise<ResultadoSync> {
   const puxados = await aplicarPull(resp);
   await setLastPullAt(resp.serverNow);
 
-  return { puxados, enviados, serverNow: resp.serverNow };
+  return { puxados, enviados: enviados + eventosTrilha, serverNow: resp.serverNow };
 }

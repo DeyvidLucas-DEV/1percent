@@ -270,6 +270,7 @@ syncRoutes.post('/push', async (c) => {
           });
       }
     }
+
   });
 
   return c.json({ ok: true, serverNow: new Date().toISOString() });

@@ -8,7 +8,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(
-  metodo: 'GET' | 'POST' | 'DELETE',
+  metodo: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   rota: string,
   body?: unknown,
   exigeAuth = true
@@ -35,5 +35,6 @@ export const api = {
   get: <T>(rota: string) => request<T>('GET', rota),
   post: <T>(rota: string, body?: unknown, exigeAuth = true) =>
     request<T>('POST', rota, body, exigeAuth),
+  patch: <T>(rota: string, body?: unknown) => request<T>('PATCH', rota, body),
   del: <T>(rota: string) => request<T>('DELETE', rota),
 };

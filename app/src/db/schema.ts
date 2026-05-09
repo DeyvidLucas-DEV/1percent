@@ -93,9 +93,34 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_pull_at    TEXT
 );
 INSERT OR IGNORE INTO sync_state (id, last_pull_at) VALUES (1, NULL);
+
+-- Trilha longitudinal do usuário (v3 §4.1). Append-only, UUID gerado no app.
+-- NÃO entra em TABELAS_SYNC porque o sync é distinto (idempotente, sem
+-- updated_at — eventos não são editáveis). Push via rota dedicada /trail/batch.
+CREATE TABLE IF NOT EXISTS user_trail_events (
+  id              TEXT    PRIMARY KEY,
+  tipo            TEXT    NOT NULL,
+  occurred_at     TEXT    NOT NULL,
+  source          TEXT    NOT NULL,
+  area_id         INTEGER REFERENCES areas(id),
+  tarefa_id       INTEGER REFERENCES tarefas(id),
+  session_id      TEXT,
+  device_id       TEXT,
+  payload_json    TEXT    NOT NULL DEFAULT '{}',
+  privacy_level   TEXT    NOT NULL DEFAULT 'private',
+  synced_at       TEXT,
+  created_at      TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_trail_sync       ON user_trail_events(synced_at, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_trail_tipo_data  ON user_trail_events(tipo, occurred_at);
 `;
 
 const TABELAS_SYNC = ['areas', 'tarefas', 'execucoes', 'reflexoes_diarias', 'autoavaliacao_inicial', 'eventos'] as const;
+
+// Tabelas obsoletas (do MVP v1 abandonado). Apagar idempotente em devices que
+// já criaram. Não dependem de FKs externas; ordem só importa se houver REFERENCES.
+const TABELAS_OBSOLETAS = ['sugestoes_rotina', 'area_diagnosticos', 'interacoes_ia'] as const;
 
 async function colunaExiste(db: Db, tabela: string, coluna: string): Promise<boolean> {
   const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tabela})`);
@@ -103,6 +128,12 @@ async function colunaExiste(db: Db, tabela: string, coluna: string): Promise<boo
 }
 
 async function rodarMigracoes(db: Db): Promise<void> {
+  // Limpa tabelas do MVP v1 que foi abandonado em favor da arquitetura v3
+  // (trilha longitudinal). Idempotente: se a tabela não existe, é no-op.
+  for (const t of TABELAS_OBSOLETAS) {
+    await db.execAsync(`DROP TABLE IF EXISTS ${t}`);
+  }
+
   for (const t of TABELAS_SYNC) {
     if (!(await colunaExiste(db, t, 'updated_at'))) {
       await db.execAsync(`ALTER TABLE ${t} ADD COLUMN updated_at TEXT`);

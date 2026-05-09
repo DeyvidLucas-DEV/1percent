@@ -3,6 +3,9 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { authRoutes } from './routes/auth.ts';
 import { syncRoutes } from './routes/sync.ts';
+import { trailRoutes } from './routes/trail.ts';
+import { aiRoutes } from './routes/ai.ts';
+import { memoryRoutes } from './routes/memory.ts';
 import { exigirAuth } from './auth/middleware.ts';
 import { db } from './db/client.ts';
 import { users } from './db/schema.ts';
@@ -18,6 +21,9 @@ app.get('/health', (c) => c.json({ ok: true }));
 
 app.route('/auth', authRoutes);
 app.route('/sync', syncRoutes);
+app.route('/trail', trailRoutes);
+app.route('/ai', aiRoutes);
+app.route('/memory', memoryRoutes);
 
 app.get('/me', exigirAuth, async (c) => {
   const userId = c.get('userId');

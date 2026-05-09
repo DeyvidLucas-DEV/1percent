@@ -2,6 +2,7 @@ import { getDb } from '../schema';
 import type { Tarefa, Execucao, StatusExecucao } from '../types';
 import { agoraIso, hojeIso } from '../../lib/datas';
 import { parseISO, getDay } from 'date-fns';
+import { inserirEvento } from './trailEvents';
 
 export async function listarTarefasAtivas(): Promise<Tarefa[]> {
   const db = await getDb();
@@ -58,12 +59,24 @@ export async function marcarExecucao(
 ): Promise<void> {
   const db = await getDb();
   const now = agoraIso();
+
+  // Lê status anterior pra alimentar o evento da trilha. Não bloqueia se falhar.
+  const anterior = await db
+    .getFirstAsync<{ status: StatusExecucao }>(
+      `SELECT status FROM execucoes WHERE tarefa_id = ? AND data = ?`,
+      [tarefaId, data]
+    )
+    .catch(() => null);
+
   await db.runAsync(
     `INSERT INTO execucoes (tarefa_id, data, status, created_at)
      VALUES (?, ?, ?, ?)
      ON CONFLICT(tarefa_id, data) DO UPDATE SET status = excluded.status`,
     [tarefaId, data, status, now]
   );
+
+  // No-op silencioso se falhar — não pode quebrar o checklist.
+  registrarEventoMudanca(tarefaId, anterior?.status ?? null, status, data).catch(() => {});
 }
 
 export async function removerExecucao(
@@ -71,10 +84,42 @@ export async function removerExecucao(
   data: string = hojeIso()
 ): Promise<void> {
   const db = await getDb();
+  const anterior = await db
+    .getFirstAsync<{ status: StatusExecucao }>(
+      `SELECT status FROM execucoes WHERE tarefa_id = ? AND data = ?`,
+      [tarefaId, data]
+    )
+    .catch(() => null);
+
   await db.runAsync(
     `DELETE FROM execucoes WHERE tarefa_id = ? AND data = ?`,
     [tarefaId, data]
   );
+
+  if (anterior?.status) {
+    registrarEventoMudanca(tarefaId, anterior.status, null, data).catch(() => {});
+  }
+}
+
+async function registrarEventoMudanca(
+  tarefaId: number,
+  statusAntes: StatusExecucao | null,
+  statusDepois: StatusExecucao | null,
+  data: string
+): Promise<void> {
+  const db = await getDb();
+  const t = await db.getFirstAsync<{ area_id: number }>(
+    `SELECT area_id FROM tarefas WHERE id = ?`,
+    [tarefaId]
+  );
+  if (!t) return;
+  await inserirEvento({
+    tipo: 'task_status_changed',
+    source: 'app',
+    areaId: t.area_id,
+    tarefaId,
+    payload: { statusAntes, statusDepois, dataExecucao: data },
+  });
 }
 
 export async function criarTarefa(dados: {
