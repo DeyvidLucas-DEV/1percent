@@ -21,6 +21,28 @@ const dailyNoteBody = z.object({
       areasFortes: z.array(z.string()).optional(),
       areasNegligenciadas: z.array(z.string()).optional(),
       tarefasMaisFalhadas: z.array(z.string()).optional(),
+      tarefasAtivas: z
+        .array(
+          z.object({
+            id: z.number().int(),
+            areaSlug: z.string(),
+            nome: z.string(),
+            frequencia: z.enum(['diaria', 'semanal', 'mensal']),
+            alvoCount: z.number().int(),
+            peso: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+            horario: z.string().nullable(),
+          })
+        )
+        .optional(),
+      intensidade: z.enum(['leve', 'moderada', 'intensa', 'desorganizada']).optional(),
+      cargaSemanal: z.number().optional(),
+      horarioTrabalho: z
+        .object({
+          inicio: z.string(),
+          fim: z.string(),
+        })
+        .nullable()
+        .optional(),
     })
     .optional(),
 });
@@ -133,6 +155,7 @@ aiRoutes.post('/daily-note', async (c) => {
     descricao: r.descricao,
     exigeConfirmacao: r.exigeConfirmacao,
     criarTarefa: r.criarTarefa,
+    pausarTarefa: r.pausarTarefa,
   }));
 
   if (recomendacoesComId.length > 0) {

@@ -16,11 +16,13 @@ import { PageHeader } from '../../src/components/ui/PageHeader';
 import { api, ApiError } from '../../src/lib/api';
 import { carregarDashboard } from '../../src/domain/agregados';
 import { inserirEvento } from '../../src/db/queries/trailEvents';
-import { criarTarefa } from '../../src/db/queries/tarefas';
+import { criarTarefa, inativarTarefa } from '../../src/db/queries/tarefas';
 import { listarTodasAreas } from '../../src/db/queries/areas';
 import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
+import { getUser } from '../../src/db/queries/users';
 import { validarSugestaoTarefaIA, type SugestaoTarefaIA } from '../../src/domain/sugestoes';
 import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
+import type { Intensidade } from '../../src/domain/intensidade';
 
 type CriarTarefaPayload = {
   areaSlug: string;
@@ -31,6 +33,12 @@ type CriarTarefaPayload = {
   horarioSugerido: string | null;
 };
 
+type PausarTarefaPayload = {
+  tarefaId: number;
+  nome: string;
+  motivo: string;
+};
+
 type Recomendacao = {
   id: string;
   tipo:
@@ -39,10 +47,12 @@ type Recomendacao = {
     | 'reduzir_carga'
     | 'priorizar_area'
     | 'acao_reparadora'
-    | 'conversa_dificil';
+    | 'conversa_dificil'
+    | 'pausar_tarefa';
   descricao: string;
   exigeConfirmacao: true;
   criarTarefa: CriarTarefaPayload | null;
+  pausarTarefa: PausarTarefaPayload | null;
 };
 
 type FatoCandidato = {
@@ -78,6 +88,7 @@ const TIPO_REC_LABEL: Record<Recomendacao['tipo'], string> = {
   priorizar_area: 'Priorizar área',
   acao_reparadora: 'Ação reparadora',
   conversa_dificil: 'Conversa difícil',
+  pausar_tarefa: 'Pausar tarefa',
 };
 
 const FREQ_LABEL: Record<'diaria' | 'semanal' | 'mensal', string> = {
@@ -114,20 +125,63 @@ export default function ContarOdia() {
   const [statusRec, setStatusRec] = useState<Record<string, 'pendente' | 'aceita' | 'recusada'>>({});
   const [contexto, setContexto] = useState<{
     percentualGeral7d: number;
-    areasNegligenciadas: string[];
     areasFortes: string[];
+    areasNegligenciadas: string[];
+    intensidade: Intensidade;
+    cargaSemanal: number;
+    horarioTrabalho: { inicio: string; fim: string } | null;
+    tarefasAtivas: Array<{
+      id: number;
+      areaSlug: string;
+      nome: string;
+      frequencia: 'diaria' | 'semanal' | 'mensal';
+      alvoCount: number;
+      peso: 1 | 2 | 3;
+      horario: string | null;
+    }>;
   } | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const d = await carregarDashboard();
+      const [d, tarefas, todasAreas, user] = await Promise.all([
+        carregarDashboard(),
+        listarTarefasAtivas(),
+        listarTodasAreas(),
+        getUser(),
+      ]);
       if (!alive) return;
       const ordenadas = [...d.porArea].sort((a, b) => a.percentual7d - b.percentual7d);
+      const slugPorId = new Map(todasAreas.map((a) => [a.id, a.slug]));
+
+      // Carga semanal aproximada (mesmo cálculo do domain/intensidade.ts).
+      const cargaSemanal = tarefas.reduce((s, t) => {
+        if (t.frequencia === 'diaria') return s + t.peso * 7;
+        if (t.frequencia === 'semanal') return s + t.peso * t.alvo_count;
+        return s + (t.peso * t.alvo_count) / 4;
+      }, 0);
+
       setContexto({
         percentualGeral7d: d.percentualGeral,
-        areasNegligenciadas: ordenadas.slice(0, 3).map((a) => a.area.slug),
         areasFortes: ordenadas.slice(-3).map((a) => a.area.slug).reverse(),
+        areasNegligenciadas: ordenadas.slice(0, 3).map((a) => a.area.slug),
+        intensidade: d.intensidade,
+        cargaSemanal: Math.round(cargaSemanal),
+        horarioTrabalho:
+          user?.horario_trabalho_inicio && user?.horario_trabalho_fim
+            ? { inicio: user.horario_trabalho_inicio, fim: user.horario_trabalho_fim }
+            : null,
+        tarefasAtivas: tarefas
+          .filter((t) => t.ativa === 1)
+          .map((t) => ({
+            id: t.id,
+            areaSlug: slugPorId.get(t.area_id) ?? 'rotina',
+            nome: t.nome,
+            frequencia: t.frequencia,
+            alvoCount: t.alvo_count,
+            peso: t.peso,
+            horario: t.horario,
+          })),
       });
     })();
     return () => {
@@ -176,8 +230,20 @@ export default function ContarOdia() {
   const aceitarRec = useCallback(
     async (rec: Recomendacao) => {
       let tarefaCriadaId: number | null = null;
+      let tarefaPausadaId: number | null = null;
       let motivoRecusa: string | null = null;
 
+      // 1. Pausar (se houver). Roda primeiro pra liberar o slot antes da criação.
+      if (rec.pausarTarefa) {
+        try {
+          await inativarTarefa(rec.pausarTarefa.tarefaId);
+          tarefaPausadaId = rec.pausarTarefa.tarefaId;
+        } catch {
+          // Tarefa pode não existir mais — segue, registra na trilha pra auditoria.
+        }
+      }
+
+      // 2. Criar (se houver), validando antes via domínio.
       if (rec.criarTarefa) {
         const sugestao: SugestaoTarefaIA = {
           areaSlug: rec.criarTarefa.areaSlug,
@@ -206,14 +272,15 @@ export default function ContarOdia() {
             alvoCount: t.alvoCount,
             horario: t.horario,
           });
-          try {
-            await reagendarTudo();
-          } catch {}
         } else {
           motivoRecusa = validacao.motivoRecusa;
-          // Falha na validação não bloqueia o aceite — só não cria tarefa.
-          // O usuário ainda pode querer registrar que aceitou a ideia.
         }
+      }
+
+      if (tarefaCriadaId !== null || tarefaPausadaId !== null) {
+        try {
+          await reagendarTudo();
+        } catch {}
       }
 
       await inserirEvento({
@@ -225,6 +292,7 @@ export default function ContarOdia() {
           descricao: rec.descricao,
           fonteEventId: resp?.eventId,
           tarefaCriadaId,
+          tarefaPausadaId,
           tarefaRecusadaPor: motivoRecusa,
         },
       });
@@ -365,6 +433,14 @@ export default function ContarOdia() {
                         <Text style={styles.recTipo}>{TIPO_REC_LABEL[rec.tipo]}</Text>
                         <Text style={styles.recDesc}>{rec.descricao}</Text>
 
+                        {rec.pausarTarefa && (
+                          <View style={[styles.tarefaPrev, styles.tarefaPrevPausar]}>
+                            <Text style={styles.tarefaPrevKicker}>VAI PAUSAR</Text>
+                            <Text style={styles.tarefaPrevNome}>{rec.pausarTarefa.nome}</Text>
+                            <Text style={styles.tarefaPrevMeta}>{rec.pausarTarefa.motivo}</Text>
+                          </View>
+                        )}
+
                         {t && (
                           <View style={styles.tarefaPrev}>
                             <Text style={styles.tarefaPrevKicker}>VAI VIRAR TAREFA</Text>
@@ -393,14 +469,26 @@ export default function ContarOdia() {
                               onPress={() => aceitarRec(rec)}
                             >
                               <Text style={styles.btnAceitarTxt}>
-                                {t ? 'Aceitar e criar tarefa' : 'Aceitar'}
+                                {t && rec.pausarTarefa
+                                  ? 'Aceitar (substituir tarefa)'
+                                  : t
+                                  ? 'Aceitar e criar tarefa'
+                                  : rec.pausarTarefa
+                                  ? 'Aceitar e pausar'
+                                  : 'Aceitar'}
                               </Text>
                             </Pressable>
                           </View>
                         )}
                         {status === 'aceita' && (
                           <Text style={styles.tagAceita}>
-                            {t ? 'Aceito. Tarefa criada.' : 'Aceito.'}
+                            {t && rec.pausarTarefa
+                              ? 'Aceito. Tarefa substituída.'
+                              : t
+                              ? 'Aceito. Tarefa criada.'
+                              : rec.pausarTarefa
+                              ? 'Aceito. Tarefa pausada.'
+                              : 'Aceito.'}
                           </Text>
                         )}
                         {status === 'recusada' && (
@@ -564,6 +652,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderLeftWidth: 3,
     borderLeftColor: tema.acento,
+  },
+  tarefaPrevPausar: {
+    borderLeftColor: tema.alerta,
   },
   tarefaPrevKicker: {
     color: tema.textoFraco,

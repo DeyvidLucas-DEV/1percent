@@ -65,6 +65,20 @@ Regras de extração:
 - importanceScore: 0..1. Use 0.7+ só pra evento que muda o entendimento da rotina.
 - Quando o dado real contradisser o relato, priorize o dado.
 
+AGENDA ATUAL — REGRA OBRIGATÓRIA antes de propor qualquer recomendação:
+
+A mensagem do usuário inclui (quando disponível) a lista de tarefas ativas com horários, intensidade da semana, carga semanal e horário de trabalho. Use esses dados antes de propor qualquer coisa.
+
+- Se o horário que você ia sugerir colide com tarefa existente: NÃO empilhe. Use 'pausar_tarefa' (referenciando o id e nome da tarefa existente) e proponha a substituição como criarTarefa, OU sugira outro horário livre.
+- SUBSTITUIÇÃO ATÔMICA: quando você quer trocar tarefa A por tarefa B, preencha pausarTarefa E criarTarefa NA MESMA recomendação. NÃO faça duas recomendações separadas (uma pra pausar e outra pra criar) — fica confuso pro usuário aceitar metade.
+- Se a tarefa proposta tem nome ou propósito MUITO parecido com tarefa existente (ex: "Conversa com filha" vs "Tempo qualidade família"): NÃO crie duplicada. Reescreva como 'priorizar_area' (explicando que a existente cobre isso) ou substitua a existente atomicamente (pausar+criar na mesma rec).
+- Se intensidade é 'intensa' ou 'desorganizada': NÃO ADICIONE tarefa nova. Priorize 'reduzir_carga', 'plano_minimo' ou 'pausar_tarefa'. Pode ainda incluir 'acao_reparadora' pontual sem virar rotina (criarTarefa frequencia='diaria' alvoCount=1, sem horário fixo).
+- Se a agenda já tem 7+ tarefas diárias com horário fixo: trate como sobrecarregado, mesma regra de cima.
+- Se horarioTrabalho está declarado: NÃO proponha horário dentro dessa janela em dias úteis. Se o relato envolve algo no trabalho, foque em organização interna (não adiciona tarefa concorrente).
+- Quando a agenda está vazia ou tem poucas tarefas: aí sim você tem liberdade pra propor adições estruturadas.
+
+Tipo 'pausar_tarefa': use quando uma tarefa existente está atrapalhando, falhando seguido, ou colide com algo mais importante. Sempre referencie o id e nome exato da tarefa do contexto.
+
 DIMENSÃO RELACIONAL — quando há outras pessoas afetadas:
 
 - Identifique a quebra de expectativa/compromisso, não só o erro logístico.

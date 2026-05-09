@@ -46,6 +46,8 @@ export type User = {
   filhos: number;
   created_at: string;
   onboarded_at: string | null;
+  horario_trabalho_inicio: string | null;
+  horario_trabalho_fim: string | null;
 };
 
 export type Reflexao = {

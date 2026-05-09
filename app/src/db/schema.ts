@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS users (
   estado_civil    TEXT    NOT NULL,
   filhos          INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT    NOT NULL,
-  onboarded_at    TEXT
+  onboarded_at    TEXT,
+  horario_trabalho_inicio TEXT,
+  horario_trabalho_fim    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS areas (
@@ -147,6 +149,15 @@ async function rodarMigracoes(db: Db): Promise<void> {
   // Horario por tarefa (HH:MM). NULL = sem horario fixo.
   if (!(await colunaExiste(db, 'tarefas', 'horario'))) {
     await db.execAsync(`ALTER TABLE tarefas ADD COLUMN horario TEXT`);
+  }
+
+  // Horario de trabalho do usuario. Quando preenchido, IA evita propor
+  // tarefas dentro dessa janela em dias uteis.
+  if (!(await colunaExiste(db, 'users', 'horario_trabalho_inicio'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN horario_trabalho_inicio TEXT`);
+  }
+  if (!(await colunaExiste(db, 'users', 'horario_trabalho_fim'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN horario_trabalho_fim TEXT`);
   }
 
   // Triggers que mantêm updated_at em dia automaticamente.

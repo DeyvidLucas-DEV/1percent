@@ -42,6 +42,12 @@ export const criarTarefaSchema = z.object({
   horarioSugerido: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
 });
 
+export const pausarTarefaSchema = z.object({
+  tarefaId: z.number().int(),
+  nome: z.string(),
+  motivo: z.string().min(1),
+});
+
 export const recomendacaoImediataSchema = z.object({
   tipo: z.enum([
     'plano_minimo',
@@ -50,10 +56,12 @@ export const recomendacaoImediataSchema = z.object({
     'priorizar_area',
     'acao_reparadora',
     'conversa_dificil',
+    'pausar_tarefa',
   ]),
   descricao: z.string().min(1),
   exigeConfirmacao: z.literal(true),
   criarTarefa: criarTarefaSchema.nullable(),
+  pausarTarefa: pausarTarefaSchema.nullable(),
 });
 
 export const extracaoMemoriaIaSchema = z.object({
@@ -136,6 +144,7 @@ const JSON_SCHEMA = {
                 'priorizar_area',
                 'acao_reparadora',
                 'conversa_dificil',
+                'pausar_tarefa',
               ],
             },
             descricao: { type: 'string' },
@@ -160,8 +169,18 @@ const JSON_SCHEMA = {
                 'horarioSugerido',
               ],
             },
+            pausarTarefa: {
+              type: ['object', 'null'],
+              additionalProperties: false,
+              properties: {
+                tarefaId: { type: 'integer' },
+                nome: { type: 'string' },
+                motivo: { type: 'string' },
+              },
+              required: ['tarefaId', 'nome', 'motivo'],
+            },
           },
-          required: ['tipo', 'descricao', 'exigeConfirmacao', 'criarTarefa'],
+          required: ['tipo', 'descricao', 'exigeConfirmacao', 'criarTarefa', 'pausarTarefa'],
         },
       },
     },
@@ -169,11 +188,25 @@ const JSON_SCHEMA = {
   },
 } as const;
 
+export type TarefaContexto = {
+  id: number;
+  areaSlug: string;
+  nome: string;
+  frequencia: 'diaria' | 'semanal' | 'mensal';
+  alvoCount: number;
+  peso: 1 | 2 | 3;
+  horario: string | null;
+};
+
 export type ContextoDadosUsuario = {
   percentualGeral7d?: number;
   areasFortes?: string[];
   areasNegligenciadas?: string[];
   tarefasMaisFalhadas?: string[];
+  tarefasAtivas?: TarefaContexto[];
+  intensidade?: 'leve' | 'moderada' | 'intensa' | 'desorganizada';
+  cargaSemanal?: number;
+  horarioTrabalho?: { inicio: string; fim: string } | null;
 };
 
 export type ResultadoExtracao = {
@@ -188,17 +221,55 @@ export async function gerarExtracaoMemoria(input: {
   contextoDados?: ContextoDadosUsuario;
   contextoUsuario?: { nome?: string; idade?: number; estadoCivil?: string };
 }): Promise<ResultadoExtracao> {
-  const userMsg = [
-    input.contextoUsuario ? `Sobre o usuário: ${JSON.stringify(input.contextoUsuario)}` : null,
-    input.contextoDados
-      ? `Dados reais dos últimos 7 dias: ${JSON.stringify(input.contextoDados)}`
-      : null,
-    '',
-    'Relato do usuário sobre o dia:',
-    input.relatoUsuario,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const ctx = input.contextoDados;
+  const partes: (string | null)[] = [];
+
+  if (input.contextoUsuario) {
+    partes.push(`Sobre o usuário: ${JSON.stringify(input.contextoUsuario)}`);
+  }
+
+  if (ctx) {
+    if (ctx.percentualGeral7d !== undefined) {
+      partes.push(`Performance geral 7d: ${ctx.percentualGeral7d}%`);
+    }
+    if (ctx.intensidade) {
+      partes.push(`Intensidade da semana: ${ctx.intensidade}`);
+    }
+    if (ctx.cargaSemanal !== undefined) {
+      partes.push(`Carga semanal calculada: ${ctx.cargaSemanal}`);
+    }
+    if (ctx.areasNegligenciadas?.length) {
+      partes.push(`Áreas negligenciadas: ${ctx.areasNegligenciadas.join(', ')}`);
+    }
+    if (ctx.areasFortes?.length) {
+      partes.push(`Áreas fortes: ${ctx.areasFortes.join(', ')}`);
+    }
+    if (ctx.tarefasMaisFalhadas?.length) {
+      partes.push(`Tarefas mais falhadas: ${ctx.tarefasMaisFalhadas.join(', ')}`);
+    }
+    if (ctx.horarioTrabalho) {
+      partes.push(
+        `Horário de trabalho declarado: ${ctx.horarioTrabalho.inicio} - ${ctx.horarioTrabalho.fim} (zona ocupada todos os dias úteis)`
+      );
+    }
+    if (ctx.tarefasAtivas?.length) {
+      const linhas = ctx.tarefasAtivas.map((t) => {
+        const meta = [t.areaSlug, t.frequencia, `peso ${t.peso}`];
+        if (t.alvoCount > 1 && t.frequencia !== 'diaria') meta.push(`${t.alvoCount}x`);
+        if (t.horario) meta.push(`às ${t.horario}`);
+        return `  - id ${t.id}: "${t.nome}" [${meta.join(' · ')}]`;
+      });
+      partes.push(`AGENDA ATUAL (tarefas ativas):\n${linhas.join('\n')}`);
+    } else {
+      partes.push(`AGENDA ATUAL: vazia (nenhuma tarefa ativa)`);
+    }
+  }
+
+  partes.push('');
+  partes.push('Relato do usuário sobre o dia:');
+  partes.push(input.relatoUsuario);
+
+  const userMsg = partes.filter((p) => p !== null).join('\n');
 
   const resp = await openai.chat.completions.create({
     model: MODELO_PADRAO,

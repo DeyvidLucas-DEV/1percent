@@ -48,6 +48,20 @@ export async function marcarOnboardingCompleto(): Promise<void> {
   await db.runAsync(`UPDATE users SET onboarded_at = ? WHERE id = 1`, [agoraIso()]);
 }
 
+// Horário de trabalho. Quando preenchido, IA evita propor tarefas dentro
+// dessa janela em dias úteis. UI pra editar entra em fase futura — por
+// ora pode ser setado manualmente em SQLite ou via tela de config.
+export async function salvarHorarioTrabalho(
+  inicio: string | null,
+  fim: string | null
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE users SET horario_trabalho_inicio = ?, horario_trabalho_fim = ? WHERE id = 1`,
+    [inicio, fim]
+  );
+}
+
 export async function salvarAutoavaliacao(
   notas: { area_id: number; nota: number }[]
 ): Promise<void> {
