@@ -64,6 +64,19 @@ const TIPO_EVT_LABEL: Record<EventoClassificado['tipo'], string> = {
   preference_signal: 'Sinal de preferência',
 };
 
+const CATEGORIA_LABEL: Record<string, string> = {
+  rotina: 'Rotina',
+  familia: 'Família',
+  trabalho: 'Trabalho',
+  financas: 'Finanças',
+  espiritual: 'Espiritual',
+  saude_fisica: 'Saúde física',
+  saude_emocional: 'Saúde emocional',
+  amizades: 'Amizades',
+  crescimento: 'Crescimento',
+  sabedoria: 'Sabedoria',
+};
+
 export default function ContarOdia() {
   const router = useRouter();
   const [texto, setTexto] = useState('');
@@ -218,9 +231,14 @@ export default function ContarOdia() {
                   <Text style={styles.kicker}>LEITURA DIRETA</Text>
                   {resp.extracao.eventosClassificados.map((e, i) => (
                     <View key={i} style={styles.evento}>
-                      <Text style={styles.eventoTipo}>
-                        {TIPO_EVT_LABEL[e.tipo]} · confiança {e.confianca}
-                      </Text>
+                      <View style={styles.eventoCabecalho}>
+                        <Text style={styles.eventoTipo}>
+                          {TIPO_EVT_LABEL[e.tipo].toUpperCase()}
+                        </Text>
+                        <View style={styles.confiancaPill}>
+                          <Text style={styles.confiancaPillTxt}>{e.confianca}</Text>
+                        </View>
+                      </View>
                       <Text style={styles.eventoDesc}>{e.descricao}</Text>
                     </View>
                   ))}
@@ -232,11 +250,15 @@ export default function ContarOdia() {
                   <Text style={styles.kicker}>FATOS APRENDIDOS</Text>
                   {resp.extracao.fatosCandidatos.map((f, i) => (
                     <View key={i} style={styles.fato}>
-                      <Text style={styles.fatoChave}>
-                        {f.categoria} · {f.chave}
-                      </Text>
+                      <View style={styles.eventoCabecalho}>
+                        <Text style={styles.fatoCategoria}>
+                          {(CATEGORIA_LABEL[f.categoria] ?? f.categoria).toUpperCase()}
+                        </Text>
+                        <View style={styles.confiancaPill}>
+                          <Text style={styles.confiancaPillTxt}>{f.confianca}</Text>
+                        </View>
+                      </View>
                       <Text style={styles.fatoValor}>{f.valor}</Text>
-                      <Text style={styles.fatoConf}>confiança {f.confianca}</Text>
                     </View>
                   ))}
                   <Text style={styles.notaFato}>
@@ -363,31 +385,49 @@ const styles = StyleSheet.create({
     color: tema.textoFraco,
     textAlign: 'center',
   },
-  evento: { marginBottom: 8 },
+  evento: { marginBottom: 12 },
+  eventoCabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   eventoTipo: {
     color: tema.textoFraco,
     fontSize: 11,
     fontFamily: tema.fontFamily.textBold,
-    letterSpacing: 0.6,
-    marginBottom: 2,
+    letterSpacing: 1.0,
+  },
+  fatoCategoria: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 1.0,
+  },
+  confiancaPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: tema.bgInput,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  confiancaPillTxt: {
+    color: tema.textoFraco,
+    fontSize: 10,
+    fontFamily: tema.fontFamily.textSemi,
+    letterSpacing: 0.4,
   },
   eventoDesc: { color: tema.texto, fontSize: 14, lineHeight: 19 },
   fato: {
     backgroundColor: tema.bg,
-    padding: 10,
+    padding: 12,
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: tema.borda,
   },
-  fatoChave: {
-    color: tema.textoFraco,
-    fontSize: 11,
-    fontFamily: tema.fontFamily.textBold,
-    letterSpacing: 0.6,
-  },
-  fatoValor: { color: tema.texto, fontSize: 14, lineHeight: 19, marginTop: 2 },
-  fatoConf: { color: tema.textoFraco, fontSize: 11, marginTop: 4 },
+  fatoValor: { color: tema.texto, fontSize: 14, lineHeight: 20, marginTop: 2 },
   notaFato: {
     color: tema.textoFraco,
     fontSize: 11,

@@ -177,12 +177,11 @@ export default function Memoria() {
                       </>
                     ) : (
                       <>
-                        <Text style={styles.chave}>{f.chave}</Text>
                         <Text style={styles.valor}>{f.valor}</Text>
                         <View style={styles.linhaMeta}>
-                          <Text style={styles.metaTxt}>
-                            confiança {f.confianca}
-                          </Text>
+                          <View style={styles.confiancaPill}>
+                            <Text style={styles.confiancaPillTxt}>{f.confianca}</Text>
+                          </View>
                           <View style={{ flex: 1 }} />
                           <Pressable
                             onPress={() => {
@@ -254,25 +253,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: tema.borda,
   },
-  chave: {
-    color: tema.textoFraco,
-    fontSize: 11,
-    fontFamily: tema.fontFamily.textBold,
-    letterSpacing: 0.6,
-  },
   valor: {
     color: tema.texto,
     fontSize: 14,
     lineHeight: 20,
-    marginTop: 4,
   },
   linhaMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
     gap: 14,
   },
-  metaTxt: { color: tema.textoFraco, fontSize: 11 },
+  confiancaPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: tema.bgInput,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  confiancaPillTxt: {
+    color: tema.textoFraco,
+    fontSize: 10,
+    fontFamily: tema.fontFamily.textSemi,
+    letterSpacing: 0.4,
+  },
   acaoBtn: { padding: 4 },
   input: {
     minHeight: 60,
