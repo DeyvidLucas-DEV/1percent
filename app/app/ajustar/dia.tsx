@@ -16,12 +16,33 @@ import { PageHeader } from '../../src/components/ui/PageHeader';
 import { api, ApiError } from '../../src/lib/api';
 import { carregarDashboard } from '../../src/domain/agregados';
 import { inserirEvento } from '../../src/db/queries/trailEvents';
+import { criarTarefa } from '../../src/db/queries/tarefas';
+import { listarTodasAreas } from '../../src/db/queries/areas';
+import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
+import { validarSugestaoTarefaIA, type SugestaoTarefaIA } from '../../src/domain/sugestoes';
+import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
+
+type CriarTarefaPayload = {
+  areaSlug: string;
+  nome: string;
+  frequencia: 'diaria' | 'semanal' | 'mensal';
+  alvoCount: number;
+  pesoSugerido: 1 | 2 | 3;
+  horarioSugerido: string | null;
+};
 
 type Recomendacao = {
   id: string;
-  tipo: 'plano_minimo' | 'mudar_horario' | 'reduzir_carga' | 'priorizar_area';
+  tipo:
+    | 'plano_minimo'
+    | 'mudar_horario'
+    | 'reduzir_carga'
+    | 'priorizar_area'
+    | 'acao_reparadora'
+    | 'conversa_dificil';
   descricao: string;
   exigeConfirmacao: true;
+  criarTarefa: CriarTarefaPayload | null;
 };
 
 type FatoCandidato = {
@@ -55,6 +76,14 @@ const TIPO_REC_LABEL: Record<Recomendacao['tipo'], string> = {
   mudar_horario: 'Mudar horário',
   reduzir_carga: 'Reduzir carga',
   priorizar_area: 'Priorizar área',
+  acao_reparadora: 'Ação reparadora',
+  conversa_dificil: 'Conversa difícil',
+};
+
+const FREQ_LABEL: Record<'diaria' | 'semanal' | 'mensal', string> = {
+  diaria: 'diária',
+  semanal: 'semanal',
+  mensal: 'mensal',
 };
 
 const TIPO_EVT_LABEL: Record<EventoClassificado['tipo'], string> = {
@@ -146,6 +175,47 @@ export default function ContarOdia() {
 
   const aceitarRec = useCallback(
     async (rec: Recomendacao) => {
+      let tarefaCriadaId: number | null = null;
+      let motivoRecusa: string | null = null;
+
+      if (rec.criarTarefa) {
+        const sugestao: SugestaoTarefaIA = {
+          areaSlug: rec.criarTarefa.areaSlug,
+          nome: rec.criarTarefa.nome,
+          frequencia: rec.criarTarefa.frequencia,
+          alvoCount: rec.criarTarefa.alvoCount,
+          pesoSugerido: rec.criarTarefa.pesoSugerido,
+          horarioSugerido: rec.criarTarefa.horarioSugerido,
+          justificativa: rec.descricao,
+        };
+        const [todasAreas, tarefasExistentes] = await Promise.all([
+          listarTodasAreas(),
+          listarTarefasAtivas(),
+        ]);
+        const validacao = validarSugestaoTarefaIA(sugestao, {
+          areasDisponiveis: todasAreas.map((a) => ({ id: a.id, slug: a.slug })),
+          tarefasExistentes: tarefasExistentes as any,
+        });
+        if (validacao.valida) {
+          const t = validacao.tarefaNormalizada;
+          tarefaCriadaId = await criarTarefa({
+            areaId: t.areaId,
+            nome: t.nome,
+            peso: t.peso,
+            frequencia: t.frequencia,
+            alvoCount: t.alvoCount,
+            horario: t.horario,
+          });
+          try {
+            await reagendarTudo();
+          } catch {}
+        } else {
+          motivoRecusa = validacao.motivoRecusa;
+          // Falha na validação não bloqueia o aceite — só não cria tarefa.
+          // O usuário ainda pode querer registrar que aceitou a ideia.
+        }
+      }
+
       await inserirEvento({
         tipo: 'suggestion_accepted',
         source: 'app',
@@ -154,9 +224,18 @@ export default function ContarOdia() {
           tipo: rec.tipo,
           descricao: rec.descricao,
           fonteEventId: resp?.eventId,
+          tarefaCriadaId,
+          tarefaRecusadaPor: motivoRecusa,
         },
       });
       setStatusRec((s) => ({ ...s, [rec.id]: 'aceita' }));
+
+      if (motivoRecusa) {
+        Alert.alert(
+          'Sugestão aceita, tarefa não criada',
+          `Não consegui criar tarefa automática (${motivoRecusa}). A intenção ficou registrada.`
+        );
+      }
     },
     [resp]
   );
@@ -280,10 +359,27 @@ export default function ContarOdia() {
                   <Text style={styles.kicker}>AJUSTES SUGERIDOS</Text>
                   {resp.recomendacoes.map((rec) => {
                     const status = statusRec[rec.id] ?? 'pendente';
+                    const t = rec.criarTarefa;
                     return (
                       <View key={rec.id} style={styles.recCard}>
                         <Text style={styles.recTipo}>{TIPO_REC_LABEL[rec.tipo]}</Text>
                         <Text style={styles.recDesc}>{rec.descricao}</Text>
+
+                        {t && (
+                          <View style={styles.tarefaPrev}>
+                            <Text style={styles.tarefaPrevKicker}>VAI VIRAR TAREFA</Text>
+                            <Text style={styles.tarefaPrevNome}>{t.nome}</Text>
+                            <Text style={styles.tarefaPrevMeta}>
+                              {(CATEGORIA_LABEL[t.areaSlug] ?? t.areaSlug)} ·{' '}
+                              {FREQ_LABEL[t.frequencia]}
+                              {t.alvoCount > 1 && t.frequencia !== 'diaria'
+                                ? ` ${t.alvoCount}x`
+                                : ''}
+                              {t.horarioSugerido ? ` · ${t.horarioSugerido}` : ''}
+                            </Text>
+                          </View>
+                        )}
+
                         {status === 'pendente' && (
                           <View style={styles.recBtns}>
                             <Pressable
@@ -296,12 +392,16 @@ export default function ContarOdia() {
                               style={[styles.btnSec, styles.btnAceitar]}
                               onPress={() => aceitarRec(rec)}
                             >
-                              <Text style={styles.btnAceitarTxt}>Aceitar</Text>
+                              <Text style={styles.btnAceitarTxt}>
+                                {t ? 'Aceitar e criar tarefa' : 'Aceitar'}
+                              </Text>
                             </Pressable>
                           </View>
                         )}
                         {status === 'aceita' && (
-                          <Text style={styles.tagAceita}>Aceito.</Text>
+                          <Text style={styles.tagAceita}>
+                            {t ? 'Aceito. Tarefa criada.' : 'Aceito.'}
+                          </Text>
                         )}
                         {status === 'recusada' && (
                           <Text style={styles.tagRecusada}>Recusado.</Text>
@@ -457,6 +557,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   recDesc: { color: tema.texto, fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  tarefaPrev: {
+    backgroundColor: tema.bgCard,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: tema.acento,
+  },
+  tarefaPrevKicker: {
+    color: tema.textoFraco,
+    fontSize: 10,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  tarefaPrevNome: {
+    color: tema.texto,
+    fontSize: 14,
+    fontFamily: tema.fontFamily.textSemi,
+  },
+  tarefaPrevMeta: {
+    color: tema.textoFraco,
+    fontSize: 12,
+    marginTop: 2,
+  },
   recBtns: { flexDirection: 'row', gap: 8 },
   btnSec: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   btnAceitar: { backgroundColor: tema.acento },

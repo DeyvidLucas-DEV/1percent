@@ -29,17 +29,38 @@ export const episodioSchema = z
   })
   .nullable();
 
+// Quando a recomendação tem ação concreta agendável (ex: "conversar com filha
+// hoje 20:30 sem celular"), a IA preenche este objeto e o app, ao aceitar,
+// cria uma tarefa real via criarTarefa() local. Validação de domínio passa
+// pelo validarSugestaoTarefaIA antes de virar tarefa.
+export const criarTarefaSchema = z.object({
+  areaSlug: z.string().min(1),
+  nome: z.string().min(3).max(120),
+  frequencia: z.enum(['diaria', 'semanal', 'mensal']),
+  alvoCount: z.number().int().min(1).max(30),
+  pesoSugerido: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  horarioSugerido: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+});
+
 export const recomendacaoImediataSchema = z.object({
-  tipo: z.enum(['plano_minimo', 'mudar_horario', 'reduzir_carga', 'priorizar_area']),
+  tipo: z.enum([
+    'plano_minimo',
+    'mudar_horario',
+    'reduzir_carga',
+    'priorizar_area',
+    'acao_reparadora',
+    'conversa_dificil',
+  ]),
   descricao: z.string().min(1),
   exigeConfirmacao: z.literal(true),
+  criarTarefa: criarTarefaSchema.nullable(),
 });
 
 export const extracaoMemoriaIaSchema = z.object({
   eventosClassificados: z.array(eventoClassificadoSchema),
   fatosCandidatos: z.array(fatoCandidatoSchema),
   episodio: episodioSchema,
-  recomendacoesImediatas: z.array(recomendacaoImediataSchema).max(2),
+  recomendacoesImediatas: z.array(recomendacaoImediataSchema).max(3),
 });
 
 export type ExtracaoMemoriaIA = z.infer<typeof extracaoMemoriaIaSchema>;
@@ -101,19 +122,46 @@ const JSON_SCHEMA = {
       },
       recomendacoesImediatas: {
         type: 'array',
-        maxItems: 2,
+        maxItems: 3,
         items: {
           type: 'object',
           additionalProperties: false,
           properties: {
             tipo: {
               type: 'string',
-              enum: ['plano_minimo', 'mudar_horario', 'reduzir_carga', 'priorizar_area'],
+              enum: [
+                'plano_minimo',
+                'mudar_horario',
+                'reduzir_carga',
+                'priorizar_area',
+                'acao_reparadora',
+                'conversa_dificil',
+              ],
             },
             descricao: { type: 'string' },
             exigeConfirmacao: { type: 'boolean', enum: [true] },
+            criarTarefa: {
+              type: ['object', 'null'],
+              additionalProperties: false,
+              properties: {
+                areaSlug: { type: 'string' },
+                nome: { type: 'string' },
+                frequencia: { type: 'string', enum: ['diaria', 'semanal', 'mensal'] },
+                alvoCount: { type: 'integer', minimum: 1, maximum: 30 },
+                pesoSugerido: { type: 'integer', enum: [1, 2, 3] },
+                horarioSugerido: { type: ['string', 'null'] },
+              },
+              required: [
+                'areaSlug',
+                'nome',
+                'frequencia',
+                'alvoCount',
+                'pesoSugerido',
+                'horarioSugerido',
+              ],
+            },
           },
-          required: ['tipo', 'descricao', 'exigeConfirmacao'],
+          required: ['tipo', 'descricao', 'exigeConfirmacao', 'criarTarefa'],
         },
       },
     },

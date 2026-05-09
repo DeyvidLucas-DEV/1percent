@@ -132,6 +132,7 @@ aiRoutes.post('/daily-note', async (c) => {
     tipo: r.tipo,
     descricao: r.descricao,
     exigeConfirmacao: r.exigeConfirmacao,
+    criarTarefa: r.criarTarefa,
   }));
 
   if (recomendacoesComId.length > 0) {
