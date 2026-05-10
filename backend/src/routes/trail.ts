@@ -1,11 +1,57 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import { userTrailEvents } from '../db/schema.ts';
 import { exigirAuth } from '../auth/middleware.ts';
 
 export const trailRoutes = new Hono();
 trailRoutes.use('*', exigirAuth);
+
+// Listar trilha do usuário, paginada por cursor (ISO timestamp do último
+// evento da página anterior). Mais novo primeiro.
+trailRoutes.get('/', async (c) => {
+  const userId = c.get('userId');
+  const cursor = c.req.query('cursor');
+  const limitParam = Number(c.req.query('limit') ?? 50);
+  const limit = Math.min(Math.max(1, isNaN(limitParam) ? 50 : limitParam), 100);
+
+  const cursorDate = cursor ? new Date(cursor) : null;
+  if (cursor && cursorDate && isNaN(cursorDate.getTime())) {
+    return c.json({ error: 'cursor_invalido' }, 400);
+  }
+
+  const filtro = cursorDate
+    ? and(eq(userTrailEvents.userId, userId), lt(userTrailEvents.occurredAt, cursorDate))
+    : eq(userTrailEvents.userId, userId);
+
+  const linhas = await db
+    .select()
+    .from(userTrailEvents)
+    .where(filtro)
+    .orderBy(desc(userTrailEvents.occurredAt))
+    .limit(limit + 1);
+
+  let proximoCursor: string | null = null;
+  if (linhas.length > limit) {
+    linhas.pop();
+    const ultimo = linhas[linhas.length - 1];
+    if (ultimo) proximoCursor = ultimo.occurredAt.toISOString();
+  }
+
+  return c.json({
+    eventos: linhas.map((e) => ({
+      id: e.id,
+      tipo: e.tipo,
+      occurredAt: e.occurredAt.toISOString(),
+      source: e.source,
+      areaId: e.areaId,
+      tarefaId: e.tarefaId,
+      payload: e.payloadJson ?? {},
+    })),
+    proximoCursor,
+  });
+});
 
 const eventoSchema = z.object({
   id: z.string().uuid(),

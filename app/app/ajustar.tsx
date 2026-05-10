@@ -28,6 +28,12 @@ const CARDS: Card[] = [
     rota: '/ajustar/plano',
   },
   {
+    titulo: 'Sua trilha',
+    subtitulo: 'Linha do tempo do que você fez e do que a IA viu.',
+    icone: 'time-outline',
+    rota: '/ajustar/trilha',
+  },
+  {
     titulo: 'O que o 1% aprendeu',
     subtitulo: 'Padrões e fatos sobre sua rotina. Edite ou apague o que não bate.',
     icone: 'library-outline',

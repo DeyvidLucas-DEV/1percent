@@ -33,13 +33,21 @@ export const episodioSchema = z
 // hoje 20:30 sem celular"), a IA preenche este objeto e o app, ao aceitar,
 // cria uma tarefa real via criarTarefa() local. Validação de domínio passa
 // pelo validarSugestaoTarefaIA antes de virar tarefa.
+
+// Tolerante: IA às vezes manda '9:00' (sem zero) ou string vazia. Vira null
+// em vez de derrubar a resposta inteira. App valida de novo antes de criar.
+const horarioOpcional = z
+  .string()
+  .nullable()
+  .transform((v) => (v && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null));
+
 export const criarTarefaSchema = z.object({
   areaSlug: z.string().min(1),
   nome: z.string().min(3).max(120),
   frequencia: z.enum(['diaria', 'semanal', 'mensal']),
   alvoCount: z.number().int().min(1).max(30),
   pesoSugerido: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  horarioSugerido: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  horarioSugerido: horarioOpcional,
 });
 
 export const pausarTarefaSchema = z.object({

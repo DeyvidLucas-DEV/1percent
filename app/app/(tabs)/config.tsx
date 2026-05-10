@@ -12,6 +12,7 @@ import { api } from '../../src/lib/api';
 import { getUser } from '../../src/db/queries/users';
 import { listarAreas } from '../../src/db/queries/areas';
 import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
+import { popularUltimos30Dias, limparExecucoes } from '../../src/db/queries/seed';
 import { getLastPullAt } from '../../src/db/queries/syncState';
 import { sincronizar } from '../../src/sync/sync';
 import type { User, Area, Tarefa } from '../../src/db/types';
@@ -27,6 +28,13 @@ function formatarUltimaSync(iso: string | null): string {
   } catch {
     return iso;
   }
+}
+
+function iniciais(nome?: string | null): string {
+  if (!nome) return '?';
+  const partes = nome.trim().split(/\s+/);
+  if (partes.length === 1) return partes[0]!.slice(0, 2).toUpperCase();
+  return (partes[0]![0]! + partes[partes.length - 1]![0]!).toUpperCase();
 }
 
 export default function Config() {
@@ -107,11 +115,32 @@ export default function Config() {
       <ScrollView contentContainerStyle={styles.container}>
         <PageHeader title="Configurações" />
 
-        <View style={{ height: 18 }} />
+        <View style={{ height: 14 }} />
+
+        <View style={styles.perfilCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarTxt}>{iniciais(user?.nome)}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.perfilNome} numberOfLines={1}>{user?.nome ?? '—'}</Text>
+            <Text style={styles.perfilEmail} numberOfLines={1}>
+              Conta sincronizada
+            </Text>
+          </View>
+        </View>
 
         <ConfigGroup label="Conta">
-          <ConfigRow icon="person-outline" title={user?.nome ?? '—'} />
           <ConfigRow icon="create-outline" title="Editar cadastro" onPress={() => Alert.alert('Em breve', 'Edição de cadastro chegará num próximo passo.')} />
+          <ConfigRow
+            icon="briefcase-outline"
+            title="Horário de trabalho"
+            value={
+              user?.horario_trabalho_inicio && user?.horario_trabalho_fim
+                ? `${user.horario_trabalho_inicio}–${user.horario_trabalho_fim}`
+                : 'não definido'
+            }
+            onPress={() => router.push('/configuracoes/horario-trabalho')}
+          />
           <ConfigRow icon="log-out-outline" title="Sair" danger onPress={sair} />
           <ConfigRow icon="trash-outline" title="Apagar conta" danger isLast onPress={apagarConta} />
         </ConfigGroup>
@@ -120,7 +149,7 @@ export default function Config() {
           {areas.map((a, i) => (
             <ConfigRow
               key={a.id}
-              colorBox={a.cor_base}
+              paletaSlug={a.slug}
               title={a.nome}
               value={`${tarefasCount(a.id)} ${tarefasCount(a.id) === 1 ? 'tarefa' : 'tarefas'}`}
               isLast={i === areas.length - 1}
@@ -183,6 +212,51 @@ export default function Config() {
           <ConfigRow icon="information-circle-outline" title="Versão" value={APP_VERSION} />
           <ConfigRow icon="logo-github" title="Repositório" value="DeyvidLucas-DEV/1percent" isLast />
         </ConfigGroup>
+
+        <ConfigGroup label="Dev (debug)">
+          <ConfigRow
+            icon="flask-outline"
+            title="Popular últimos 30 dias"
+            onPress={async () => {
+              try {
+                const r = await popularUltimos30Dias();
+                Alert.alert(
+                  'Pronto',
+                  `${r.inseridos} execuções inseridas em ${r.dias} dias × ${r.tarefas} tarefas.`
+                );
+              } catch (e: any) {
+                Alert.alert('Erro', String(e?.message ?? e));
+              }
+            }}
+          />
+          <ConfigRow
+            icon="trash-bin-outline"
+            title="Limpar todas as execuções"
+            danger
+            isLast
+            onPress={() => {
+              Alert.alert(
+                'Confirma',
+                'Apaga todo histórico de execuções no device. Sem volta.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Apagar',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        const n = await limparExecucoes();
+                        Alert.alert('OK', `${n} registros apagados.`);
+                      } catch (e: any) {
+                        Alert.alert('Erro', String(e?.message ?? e));
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          />
+        </ConfigGroup>
       </ScrollView>
     </SafeAreaView>
   );
@@ -190,5 +264,42 @@ export default function Config() {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: tema.bg },
-  container: { paddingBottom: 30 },
+  container: { paddingBottom: 130 },
+  perfilCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 16,
+    marginBottom: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    backgroundColor: tema.card,
+    borderRadius: 22,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: tema.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarTxt: {
+    fontFamily: tema.fontFamily.display,
+    fontSize: 18,
+    color: tema.bg,
+    letterSpacing: -0.4,
+  },
+  perfilNome: {
+    fontFamily: tema.fontFamily.display,
+    fontSize: 18,
+    color: tema.ink,
+    letterSpacing: -0.3,
+  },
+  perfilEmail: {
+    fontSize: 13,
+    color: tema.weak,
+    marginTop: 2,
+    fontFamily: tema.fontFamily.text,
+  },
 });

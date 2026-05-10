@@ -86,6 +86,8 @@ export default function RootLayout() {
           <Stack.Screen name="ajustar/dia" options={{ title: '' }} />
           <Stack.Screen name="ajustar/memoria" options={{ title: '' }} />
           <Stack.Screen name="ajustar/plano" options={{ title: '' }} />
+          <Stack.Screen name="ajustar/trilha" options={{ title: '' }} />
+          <Stack.Screen name="configuracoes/horario-trabalho" options={{ title: '' }} />
           <Stack.Screen name="reativacao" options={{ title: 'Reativação', headerBackVisible: false }} />
         </Stack>
       </SafeAreaProvider>
