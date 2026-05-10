@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   View,
@@ -25,55 +25,10 @@ type Evento = {
   source: string;
   areaId: number | null;
   tarefaId: number | null;
-  payload: Record<string, unknown>;
+  payload: Record<string, any>;
 };
 
 type RespostaTrilha = { eventos: Evento[]; proximoCursor: string | null };
-
-const TIPO_ICONE: Record<string, keyof typeof Ionicons.glyphMap> = {
-  task_status_changed: 'checkmark-circle-outline',
-  daily_note_submitted: 'mic-outline',
-  voice_note_transcribed: 'mic-outline',
-  suggestion_presented: 'bulb-outline',
-  suggestion_accepted: 'checkmark-done-outline',
-  suggestion_rejected: 'close-circle-outline',
-  weekly_plan_generated: 'calendar-outline',
-  stressor_reported: 'alert-circle-outline',
-  memory_fact_edited: 'create-outline',
-  memory_fact_deleted: 'trash-outline',
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  task_status_changed: 'Marcou tarefa',
-  daily_note_submitted: 'Relato do dia',
-  voice_note_transcribed: 'Áudio transcrito',
-  suggestion_presented: 'IA sugeriu',
-  suggestion_accepted: 'Aceitou sugestão',
-  suggestion_rejected: 'Recusou sugestão',
-  weekly_plan_generated: 'Plano semanal',
-  stressor_reported: 'Estressor',
-  memory_fact_edited: 'Fato editado',
-  memory_fact_deleted: 'Fato apagado',
-};
-
-const TIPO_COR: Record<string, string> = {
-  task_status_changed: tema.acento,
-  daily_note_submitted: tema.acento,
-  suggestion_presented: tema.alerta,
-  suggestion_accepted: tema.sucesso,
-  suggestion_rejected: tema.textoFraco,
-  weekly_plan_generated: tema.acento,
-  memory_fact_edited: tema.alerta,
-  memory_fact_deleted: tema.perigo,
-  stressor_reported: tema.perigo,
-  voice_note_transcribed: tema.acento,
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  concluido: 'concluído',
-  parcial: 'parcial',
-  nao_feito: 'não feito',
-};
 
 function rotuloDia(iso: string): string {
   const d = parseISO(iso);
@@ -82,45 +37,352 @@ function rotuloDia(iso: string): string {
   return format(d, "EEEE, d 'de' MMM", { locale: ptBR }).toUpperCase();
 }
 
-function descricaoEvento(e: Evento): string {
-  const p = e.payload;
-  switch (e.tipo) {
-    case 'task_status_changed': {
-      const antes = p.statusAntes ? STATUS_LABEL[String(p.statusAntes)] ?? p.statusAntes : '—';
-      const depois = p.statusDepois
-        ? STATUS_LABEL[String(p.statusDepois)] ?? p.statusDepois
-        : 'apagada';
-      return `${antes} → ${depois}`;
-    }
-    case 'daily_note_submitted': {
-      const relato = String(p.relato ?? '');
-      return relato.length > 120 ? relato.slice(0, 120) + '…' : relato;
-    }
-    case 'suggestion_presented':
-    case 'suggestion_accepted':
-    case 'suggestion_rejected':
-      return String(p.descricao ?? '');
-    case 'weekly_plan_generated':
-      return String(p.intencaoSemana ?? 'Plano gerado.');
-    case 'memory_fact_edited':
-      return 'Fato atualizado.';
-    case 'memory_fact_deleted':
-      return 'Fato removido.';
-    default:
-      return '';
-  }
+function hora(iso: string): string {
+  return format(parseISO(iso), 'HH:mm');
 }
 
-function agruparPorDia(eventos: Evento[]): { dia: string; eventos: Evento[] }[] {
-  const grupos: Record<string, Evento[]> = {};
+function truncar(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n).trimEnd() + '…';
+}
+
+// ─── Tipos de bloco narrativo ──────────────────────────────────────
+
+type BlocoConversa = {
+  kind: 'conversa';
+  id: string;
+  occurredAt: string;
+  relato: string;
+  episodio: { titulo: string; resumo: string } | null;
+  fatosCriados: number;
+  fatosReconfirmados: number;
+  sugestoesAceitas: number;
+  sugestoesRecusadas: number;
+  sugestoesApresentadas: number;
+};
+
+type BlocoTarefas = {
+  kind: 'tarefas';
+  id: string;
+  occurredAt: string;
+  total: number;
+  porStatus: { concluido: number; parcial: number; nao_feito: number; outros: number };
+  amostra: { tarefaId: number | null; antes: string | null; depois: string | null; quando: string }[];
+};
+
+type BlocoPlano = {
+  kind: 'plano';
+  id: string;
+  occurredAt: string;
+  intencao: string;
+  causaProvavel: string;
+  intensidade: string | null;
+  ajustes: number;
+};
+
+type BlocoMemoria = {
+  kind: 'memoria';
+  id: string;
+  occurredAt: string;
+  editados: number;
+  apagados: number;
+};
+
+type Bloco = BlocoConversa | BlocoTarefas | BlocoPlano | BlocoMemoria;
+
+// Constrói os blocos narrativos a partir dos eventos brutos. Mantém
+// um mapa de cruzamento: cada daily_note_submitted ou weekly_plan_generated
+// tem um conjunto de suggestion_presented que referenciam seu id via
+// payload.fonteEventId. Os suggestion_accepted/rejected referenciam o
+// recomendacaoId, que está em payload de cada presented.
+function montarBlocos(eventos: Evento[]): { dia: string; blocos: Bloco[] }[] {
+  // Indexa presented por fonteEventId
+  const presentedPorFonte: Record<string, Evento[]> = {};
+  for (const e of eventos) {
+    if (e.tipo === 'suggestion_presented') {
+      const fonte = String(e.payload?.fonteEventId ?? '');
+      if (!fonte) continue;
+      (presentedPorFonte[fonte] ||= []).push(e);
+    }
+  }
+
+  // Indexa accepted/rejected por recomendacaoId
+  const decisaoPorRec: Record<string, 'aceita' | 'recusada'> = {};
+  for (const e of eventos) {
+    if (e.tipo === 'suggestion_accepted' || e.tipo === 'suggestion_rejected') {
+      const rid = String(e.payload?.recomendacaoId ?? '');
+      if (!rid) continue;
+      decisaoPorRec[rid] = e.tipo === 'suggestion_accepted' ? 'aceita' : 'recusada';
+    }
+  }
+
+  // Agrupa por dia (yyyy-mm-dd)
+  const porDia: Record<string, Bloco[]> = {};
+  // Agrupadores volumosos: tarefas e memória agregam por dia
+  const tarefasAgreg: Record<string, BlocoTarefas> = {};
+  const memoriaAgreg: Record<string, BlocoMemoria> = {};
+
   for (const e of eventos) {
     const dia = e.occurredAt.slice(0, 10);
-    (grupos[dia] ||= []).push(e);
+
+    if (e.tipo === 'daily_note_submitted') {
+      const presented = presentedPorFonte[e.id] ?? [];
+      let aceitas = 0, recusadas = 0;
+      for (const p of presented) {
+        const rid = String(p.payload?.recomendacaoId ?? '');
+        const dec = decisaoPorRec[rid];
+        if (dec === 'aceita') aceitas++;
+        else if (dec === 'recusada') recusadas++;
+      }
+      const ep = e.payload?.episodio;
+      const bloco: BlocoConversa = {
+        kind: 'conversa',
+        id: e.id,
+        occurredAt: e.occurredAt,
+        relato: String(e.payload?.relato ?? ''),
+        episodio:
+          ep && typeof ep === 'object'
+            ? { titulo: String(ep.titulo ?? ''), resumo: String(ep.resumo ?? '') }
+            : null,
+        fatosCriados: Array.isArray(e.payload?.fatosCriados) ? e.payload.fatosCriados.length : 0,
+        fatosReconfirmados: Array.isArray(e.payload?.fatosReconfirmados)
+          ? e.payload.fatosReconfirmados.length
+          : 0,
+        sugestoesAceitas: aceitas,
+        sugestoesRecusadas: recusadas,
+        sugestoesApresentadas: presented.length,
+      };
+      (porDia[dia] ||= []).push(bloco);
+      continue;
+    }
+
+    if (e.tipo === 'weekly_plan_generated') {
+      const bloco: BlocoPlano = {
+        kind: 'plano',
+        id: e.id,
+        occurredAt: e.occurredAt,
+        intencao: String(e.payload?.intencaoSemana ?? 'Plano gerado.'),
+        causaProvavel: String(e.payload?.causaProvavel ?? ''),
+        intensidade: e.payload?.intensidade ? String(e.payload.intensidade) : null,
+        ajustes: Number(e.payload?.ajustesCount ?? 0),
+      };
+      (porDia[dia] ||= []).push(bloco);
+      continue;
+    }
+
+    if (e.tipo === 'task_status_changed') {
+      let agreg = tarefasAgreg[dia];
+      if (!agreg) {
+        agreg = {
+          kind: 'tarefas',
+          id: `tarefas-${dia}`,
+          occurredAt: e.occurredAt,
+          total: 0,
+          porStatus: { concluido: 0, parcial: 0, nao_feito: 0, outros: 0 },
+          amostra: [],
+        };
+        tarefasAgreg[dia] = agreg;
+        (porDia[dia] ||= []).push(agreg);
+      }
+      agreg.total++;
+      const depois = e.payload?.statusDepois ? String(e.payload.statusDepois) : null;
+      if (depois === 'concluido') agreg.porStatus.concluido++;
+      else if (depois === 'parcial') agreg.porStatus.parcial++;
+      else if (depois === 'nao_feito') agreg.porStatus.nao_feito++;
+      else agreg.porStatus.outros++;
+      if (agreg.amostra.length < 3) {
+        agreg.amostra.push({
+          tarefaId: e.tarefaId,
+          antes: e.payload?.statusAntes ? String(e.payload.statusAntes) : null,
+          depois,
+          quando: e.occurredAt,
+        });
+      }
+      // Mantém o horário do mais recente
+      if (e.occurredAt > agreg.occurredAt) agreg.occurredAt = e.occurredAt;
+      continue;
+    }
+
+    if (e.tipo === 'memory_fact_edited' || e.tipo === 'memory_fact_deleted') {
+      let agreg = memoriaAgreg[dia];
+      if (!agreg) {
+        agreg = {
+          kind: 'memoria',
+          id: `memoria-${dia}`,
+          occurredAt: e.occurredAt,
+          editados: 0,
+          apagados: 0,
+        };
+        memoriaAgreg[dia] = agreg;
+        (porDia[dia] ||= []).push(agreg);
+      }
+      if (e.tipo === 'memory_fact_edited') agreg.editados++;
+      else agreg.apagados++;
+      if (e.occurredAt > agreg.occurredAt) agreg.occurredAt = e.occurredAt;
+      continue;
+    }
   }
-  return Object.entries(grupos)
+
+  // Ordena blocos dentro do dia por occurredAt desc.
+  return Object.entries(porDia)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-    .map(([dia, evs]) => ({ dia, eventos: evs }));
+    .map(([dia, blocos]) => ({
+      dia,
+      blocos: blocos.slice().sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1)),
+    }));
 }
+
+// ─── Componentes de bloco ──────────────────────────────────────────
+
+function CardConversa({ b }: { b: BlocoConversa }) {
+  const [expandido, setExpandido] = useState(false);
+  const relato = b.relato;
+  const corto = truncar(relato, 180);
+  const podeExpandir = relato.length > 180;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <View style={[styles.iconeWrap, { backgroundColor: tema.bgInput }]}>
+          <Ionicons name="chatbubbles-outline" size={18} color={tema.acento} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitulo}>Conversa com IA</Text>
+          <Text style={styles.cardHora}>{hora(b.occurredAt)}</Text>
+        </View>
+      </View>
+
+      {b.episodio?.titulo ? (
+        <Text style={styles.episodioTitulo}>{b.episodio.titulo}</Text>
+      ) : null}
+
+      {relato ? (
+        <Pressable onPress={() => podeExpandir && setExpandido((v) => !v)}>
+          <Text style={styles.relato}>{expandido ? relato : corto}</Text>
+          {podeExpandir ? (
+            <Text style={styles.expandir}>{expandido ? 'recolher' : 'ler tudo'}</Text>
+          ) : null}
+        </Pressable>
+      ) : null}
+
+      <View style={styles.pillsLinha}>
+        {b.sugestoesApresentadas > 0 ? (
+          <Pill
+            icone="bulb-outline"
+            cor={tema.alerta}
+            texto={`${b.sugestoesApresentadas} sugestão${b.sugestoesApresentadas > 1 ? 'ões' : ''}`}
+          />
+        ) : null}
+        {b.sugestoesAceitas > 0 ? (
+          <Pill icone="checkmark-done-outline" cor={tema.sucesso} texto={`${b.sugestoesAceitas} aceita${b.sugestoesAceitas > 1 ? 's' : ''}`} />
+        ) : null}
+        {b.sugestoesRecusadas > 0 ? (
+          <Pill icone="close-outline" cor={tema.textoFraco} texto={`${b.sugestoesRecusadas} recusada${b.sugestoesRecusadas > 1 ? 's' : ''}`} />
+        ) : null}
+        {b.fatosCriados > 0 ? (
+          <Pill icone="library-outline" cor={tema.acento} texto={`${b.fatosCriados} fato${b.fatosCriados > 1 ? 's' : ''} novo${b.fatosCriados > 1 ? 's' : ''}`} />
+        ) : null}
+        {b.fatosReconfirmados > 0 ? (
+          <Pill icone="refresh-outline" cor={tema.textoFraco} texto={`${b.fatosReconfirmados} reconfirmado${b.fatosReconfirmados > 1 ? 's' : ''}`} />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function CardTarefas({ b }: { b: BlocoTarefas }) {
+  const partes: string[] = [];
+  if (b.porStatus.concluido) partes.push(`${b.porStatus.concluido} concluída${b.porStatus.concluido > 1 ? 's' : ''}`);
+  if (b.porStatus.parcial) partes.push(`${b.porStatus.parcial} parcial`);
+  if (b.porStatus.nao_feito) partes.push(`${b.porStatus.nao_feito} não feita${b.porStatus.nao_feito > 1 ? 's' : ''}`);
+  if (b.porStatus.outros) partes.push(`${b.porStatus.outros} outro${b.porStatus.outros > 1 ? 's' : ''}`);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <View style={[styles.iconeWrap, { backgroundColor: tema.bgInput }]}>
+          <Ionicons name="checkmark-circle-outline" size={18} color={tema.acento} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitulo}>Tarefas marcadas ({b.total})</Text>
+          <Text style={styles.cardHora}>até {hora(b.occurredAt)}</Text>
+        </View>
+      </View>
+      <Text style={styles.relato}>{partes.join(' · ')}</Text>
+    </View>
+  );
+}
+
+function CardPlano({ b }: { b: BlocoPlano }) {
+  return (
+    <View style={[styles.card, styles.cardDestaque]}>
+      <View style={styles.cardTopo}>
+        <View style={[styles.iconeWrap, { backgroundColor: 'rgba(245,241,229,0.12)' }]}>
+          <Ionicons name="calendar-outline" size={18} color="#F5F1E5" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.cardTitulo, styles.cardTituloDestaque]}>Plano semanal</Text>
+          <Text style={[styles.cardHora, styles.cardHoraDestaque]}>{hora(b.occurredAt)}</Text>
+        </View>
+      </View>
+      <Text style={[styles.relato, styles.relatoDestaque]}>{b.intencao}</Text>
+      <View style={styles.pillsLinha}>
+        {b.intensidade ? (
+          <Pill icone="pulse-outline" cor="#F5F1E5" texto={b.intensidade} destaque />
+        ) : null}
+        {b.ajustes > 0 ? (
+          <Pill icone="construct-outline" cor="#F5F1E5" texto={`${b.ajustes} ajuste${b.ajustes > 1 ? 's' : ''}`} destaque />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function CardMemoria({ b }: { b: BlocoMemoria }) {
+  const partes: string[] = [];
+  if (b.editados) partes.push(`${b.editados} editado${b.editados > 1 ? 's' : ''}`);
+  if (b.apagados) partes.push(`${b.apagados} apagado${b.apagados > 1 ? 's' : ''}`);
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <View style={[styles.iconeWrap, { backgroundColor: tema.bgInput }]}>
+          <Ionicons name="create-outline" size={18} color={tema.alerta} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitulo}>Memória atualizada</Text>
+          <Text style={styles.cardHora}>até {hora(b.occurredAt)}</Text>
+        </View>
+      </View>
+      <Text style={styles.relato}>{partes.join(' · ')}</Text>
+    </View>
+  );
+}
+
+function Pill({
+  icone,
+  cor,
+  texto,
+  destaque,
+}: {
+  icone: keyof typeof Ionicons.glyphMap;
+  cor: string;
+  texto: string;
+  destaque?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.pill,
+        destaque && { backgroundColor: 'rgba(245,241,229,0.12)', borderColor: 'transparent' },
+      ]}
+    >
+      <Ionicons name={icone} size={12} color={cor} />
+      <Text style={[styles.pillTxt, destaque && { color: '#F5F1E5' }]}>{texto}</Text>
+    </View>
+  );
+}
+
+// ─── Tela ──────────────────────────────────────────────────────────
 
 export default function Trilha() {
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -133,8 +395,8 @@ export default function Trilha() {
     async (cursorAtual: string | null, append: boolean) => {
       try {
         const qs = cursorAtual
-          ? `?cursor=${encodeURIComponent(cursorAtual)}&limit=50`
-          : '?limit=50';
+          ? `?cursor=${encodeURIComponent(cursorAtual)}&limit=80`
+          : '?limit=80';
         const r = await api.get<RespostaTrilha>(`/trail${qs}`);
         setEventos((prev) => (append ? [...prev, ...r.eventos] : r.eventos));
         setCursor(r.proximoCursor);
@@ -156,7 +418,7 @@ export default function Trilha() {
     })();
   }, [carregarPagina]);
 
-  const grupos = agruparPorDia(eventos);
+  const dias = useMemo(() => montarBlocos(eventos), [eventos]);
 
   return (
     <>
@@ -188,48 +450,26 @@ export default function Trilha() {
         >
           <PageHeader kicker="SUA TRILHA" title="O que aconteceu" />
           <Text style={styles.sub}>
-            Linha do tempo das suas ações e do que a IA viu. Mais recente em cima.
+            Suas conversas com a IA, tarefas marcadas, planos e o que o app aprendeu. Mais recente em cima.
           </Text>
 
           {carregando ? (
             <ActivityIndicator color={tema.texto} style={{ marginTop: 60 }} />
-          ) : eventos.length === 0 ? (
+          ) : dias.length === 0 ? (
             <View style={styles.vazio}>
               <Text style={styles.vazioTxt}>
-                Trilha vazia. Marque uma tarefa, conte um dia, ou aceite uma sugestão.
+                Nada por aqui ainda. Conte um dia, marque uma tarefa ou gere um plano.
               </Text>
             </View>
           ) : (
-            grupos.map((g) => (
-              <View key={g.dia} style={styles.bloco}>
+            dias.map((g) => (
+              <View key={g.dia} style={{ paddingHorizontal: 16, marginTop: 18 }}>
                 <Text style={styles.kicker}>{rotuloDia(g.dia)}</Text>
-                {g.eventos.map((e, i) => {
-                  const cor = TIPO_COR[e.tipo] ?? tema.textoFraco;
-                  const icone = TIPO_ICONE[e.tipo] ?? 'ellipse-outline';
-                  const desc = descricaoEvento(e);
-                  return (
-                    <View
-                      key={e.id}
-                      style={[styles.evento, i === g.eventos.length - 1 && { borderBottomWidth: 0 }]}
-                    >
-                      <View style={[styles.iconeWrap, { backgroundColor: tema.bgInput }]}>
-                        <Ionicons name={icone} size={18} color={cor} />
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View style={styles.linhaTopo}>
-                          <Text style={styles.tipoLabel}>{TIPO_LABEL[e.tipo] ?? e.tipo}</Text>
-                          <Text style={styles.hora}>
-                            {format(parseISO(e.occurredAt), 'HH:mm')}
-                          </Text>
-                        </View>
-                        {desc ? (
-                          <Text style={styles.descricao} numberOfLines={3}>
-                            {desc}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  );
+                {g.blocos.map((b) => {
+                  if (b.kind === 'conversa') return <CardConversa key={b.id} b={b} />;
+                  if (b.kind === 'tarefas') return <CardTarefas key={b.id} b={b} />;
+                  if (b.kind === 'plano') return <CardPlano key={b.id} b={b} />;
+                  return <CardMemoria key={b.id} b={b} />;
                 })}
               </View>
             ))
@@ -257,7 +497,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: -4,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  kicker: {
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 1.2,
+    color: tema.textoFraco,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   vazio: { paddingHorizontal: 24, paddingTop: 60, alignItems: 'center' },
   vazioTxt: {
@@ -266,31 +514,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  bloco: {
-    marginHorizontal: 16,
-    marginTop: 12,
+  card: {
     backgroundColor: tema.bgCard,
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 10,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: tema.borda,
   },
-  kicker: {
-    fontSize: 11,
-    fontFamily: tema.fontFamily.textBold,
-    letterSpacing: 1.2,
-    color: tema.textoFraco,
-    paddingTop: 8,
-    paddingBottom: 6,
+  cardDestaque: {
+    backgroundColor: tema.acento,
+    borderColor: tema.acento,
   },
-  evento: {
+  cardTopo: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: tema.borda,
+    marginBottom: 8,
   },
   iconeWrap: {
     width: 32,
@@ -298,28 +539,58 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
   },
-  linhaTopo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  tipoLabel: {
+  cardTitulo: {
     color: tema.texto,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: tema.fontFamily.textBold,
   },
-  hora: {
+  cardTituloDestaque: { color: '#F5F1E5' },
+  cardHora: {
     color: tema.textoFraco,
     fontSize: 11,
     fontFamily: tema.fontFamily.text,
+    marginTop: 1,
   },
-  descricao: {
+  cardHoraDestaque: { color: 'rgba(245,241,229,0.7)' },
+  episodioTitulo: {
+    color: tema.texto,
+    fontSize: 13,
+    fontFamily: tema.fontFamily.textBold,
+    marginBottom: 4,
+  },
+  relato: {
     color: tema.textoFraco,
     fontSize: 13,
-    lineHeight: 18,
-    marginTop: 3,
+    lineHeight: 19,
+  },
+  relatoDestaque: { color: 'rgba(245,241,229,0.92)' },
+  expandir: {
+    color: tema.acento,
+    fontSize: 12,
+    fontFamily: tema.fontFamily.textBold,
+    marginTop: 4,
+  },
+  pillsLinha: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: tema.bgInput,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  pillTxt: {
+    color: tema.texto,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
   },
 });

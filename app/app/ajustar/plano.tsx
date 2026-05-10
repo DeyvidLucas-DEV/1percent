@@ -28,6 +28,8 @@ import { getUser } from '../../src/db/queries/users';
 import { validarSugestaoTarefaIA, type SugestaoTarefaIA } from '../../src/domain/sugestoes';
 import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
 import type { Intensidade } from '../../src/domain/intensidade';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type CriarTarefaPayload = {
   areaSlug: string;
@@ -84,6 +86,13 @@ type RespostaPlanoSemanal = {
     inegociaveisDaSemana: string[];
     mensagemFinal: string;
   };
+  episodiosLembrados?: {
+    id: string;
+    occurredAt: string;
+    titulo: string;
+    resumo: string;
+    similaridade: number;
+  }[];
 };
 
 const TIPO_LABEL: Record<Ajuste['tipo'], string> = {
@@ -433,6 +442,28 @@ export default function PlanoSemanal() {
                 <Text style={styles.paragrafo}>{plano.plano.causaProvavel}</Text>
               </View>
 
+              {plano.episodiosLembrados && plano.episodiosLembrados.length > 0 && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>EU LEMBREI DISSO</Text>
+                  {plano.episodiosLembrados.map((ep) => (
+                    <View key={ep.id} style={styles.lembrancaCard}>
+                      <View style={styles.lembrancaTopo}>
+                        <Text style={styles.lembrancaData}>
+                          {format(parseISO(ep.occurredAt), "d 'de' MMM", { locale: ptBR })}
+                        </Text>
+                        <View style={styles.lembrancaPill}>
+                          <Text style={styles.lembrancaPillTxt}>
+                            {Math.round(ep.similaridade * 100)}% similar
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.lembrancaTitulo}>{ep.titulo}</Text>
+                      <Text style={styles.lembrancaResumo}>{ep.resumo}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
               <View style={styles.intencaoBloco}>
                 <Text style={styles.intencaoKicker}>INTENÇÃO DA SEMANA</Text>
                 <Text style={styles.intencaoTxt}>{plano.plano.intencaoSemana}</Text>
@@ -650,6 +681,48 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     fontFamily: tema.fontFamily.textBold,
   },
+  lembrancaCard: {
+    backgroundColor: tema.bgInput,
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: tema.acento,
+  },
+  lembrancaTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  lembrancaData: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  lembrancaPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: tema.bgCard,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  lembrancaPillTxt: {
+    color: tema.textoFraco,
+    fontSize: 10,
+    fontFamily: tema.fontFamily.textBold,
+  },
+  lembrancaTitulo: {
+    color: tema.texto,
+    fontSize: 14,
+    fontFamily: tema.fontFamily.textBold,
+    marginTop: 6,
+    marginBottom: 3,
+  },
+  lembrancaResumo: { color: tema.textoFraco, fontSize: 13, lineHeight: 18 },
   ajusteCard: {
     backgroundColor: tema.bg,
     padding: 12,

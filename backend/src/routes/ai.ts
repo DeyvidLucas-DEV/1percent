@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { userMemoryFacts, userTrailEvents } from '../db/schema.ts';
+import { userMemoryEpisodes, userMemoryFacts, userTrailEvents } from '../db/schema.ts';
 import { exigirAuth } from '../auth/middleware.ts';
 import { reservarChamadaIa } from '../ai/rateLimit.ts';
 import { gerarExtracaoMemoria, type ContextoDadosUsuario } from '../ai/dailyNote.ts';
@@ -11,7 +11,8 @@ import {
   gerarPlanoSemanal,
   type ContextoPlanoSemanal,
 } from '../ai/weeklyPlan.ts';
-import { custoCentavos, MODELO_PADRAO, PROVIDER } from '../ai/cliente.ts';
+import { custoCentavos, gerarEmbedding, MODELO_PADRAO, PROVIDER } from '../ai/cliente.ts';
+import { formatarEpisodiosPraPrompt, retrieveEpisodios } from '../ai/retrieval.ts';
 
 export const aiRoutes = new Hono();
 aiRoutes.use('*', exigirAuth);
@@ -71,11 +72,21 @@ aiRoutes.post('/daily-note', async (c) => {
     );
   }
 
+  // Retrieval: busca episódios passados do mesmo usuário com tema parecido
+  // (~$0.000004 por chamada, totalmente desprezível). Falha silenciosa: se
+  // o embedding ou a query der erro, gera daily-note sem RAG.
+  const episodiosLembrados = await retrieveEpisodios(userId, parsed.data.relato, {
+    k: 5,
+    minSimilaridade: 0.3,
+  });
+  const blocoHistorico = formatarEpisodiosPraPrompt(episodiosLembrados);
+
   let resultado;
   try {
     resultado = await gerarExtracaoMemoria({
       relatoUsuario: parsed.data.relato,
       contextoDados: parsed.data.contextoDados as ContextoDadosUsuario | undefined,
+      episodiosRelevantes: blocoHistorico || undefined,
     });
   } catch (e) {
     console.error('[ai] falha em /daily-note', e);
@@ -84,26 +95,15 @@ aiRoutes.post('/daily-note', async (c) => {
 
   const agora = new Date();
   const occurredAt = parsed.data.occurredAt ? new Date(parsed.data.occurredAt) : agora;
-
-  // 1) registra evento daily_note_submitted (origem do processamento).
   const dailyNoteEventId = randomUUID();
-  await db.insert(userTrailEvents).values({
-    userId,
-    id: dailyNoteEventId,
-    tipo: 'daily_note_submitted',
-    occurredAt,
-    source: 'ai',
-    payloadJson: {
-      relato: parsed.data.relato,
-      tokensInput: resultado.tokensInput,
-      tokensOutput: resultado.tokensOutput,
-      custoCentavos: custoCentavos(resultado.tokensInput, resultado.tokensOutput, resultado.modelo),
-      provider: PROVIDER,
-      modelo: resultado.modelo,
-    },
-  }).onConflictDoNothing({ target: [userTrailEvents.userId, userTrailEvents.id] });
 
-  // 2) upsert dos fatos candidatos (UNIQUE por user_id+categoria+chave).
+  // 1) upsert dos fatos candidatos. Coleta listas pra incluir no payload do
+  //    daily_note_submitted — assim a tela Trilha mostra "X fatos aprendidos"
+  //    sem precisar de outra rota.
+  type FatoResumo = { categoria: string; chave: string; valor: string; confianca: string };
+  const fatosCriados: FatoResumo[] = [];
+  const fatosReconfirmados: FatoResumo[] = [];
+
   for (const fato of resultado.extracao.fatosCandidatos) {
     const existente = await db
       .select({ id: userMemoryFacts.id, confianca: userMemoryFacts.confianca })
@@ -118,12 +118,12 @@ aiRoutes.post('/daily-note', async (c) => {
       .limit(1);
 
     if (existente[0]) {
-      // Reconfirmação: sobe confiança? Por ora só atualiza last_confirmed_at.
+      const novaConfianca = subirConfianca(existente[0].confianca, fato.confianca);
       await db
         .update(userMemoryFacts)
         .set({
           valor: fato.valor,
-          confianca: subirConfianca(existente[0].confianca, fato.confianca),
+          confianca: novaConfianca,
           lastConfirmedAt: agora,
           active: true,
           updatedAt: agora,
@@ -134,6 +134,12 @@ aiRoutes.post('/daily-note', async (c) => {
             eq(userMemoryFacts.id, existente[0].id)
           )
         );
+      fatosReconfirmados.push({
+        categoria: fato.categoria,
+        chave: fato.chave,
+        valor: fato.valor,
+        confianca: novaConfianca,
+      });
     } else {
       await db.insert(userMemoryFacts).values({
         userId,
@@ -148,6 +154,82 @@ aiRoutes.post('/daily-note', async (c) => {
         active: true,
         updatedAt: agora,
       });
+      fatosCriados.push({
+        categoria: fato.categoria,
+        chave: fato.chave,
+        valor: fato.valor,
+        confianca: fato.confianca,
+      });
+    }
+  }
+
+  // 2) grava o evento daily_note_submitted com payload enriquecido (relato
+  //    + listas de fatos criados/reconfirmados + episódio). A tela Trilha lê
+  //    isso direto e renderiza o bloco "Conversa com IA" sem rota extra.
+  await db
+    .insert(userTrailEvents)
+    .values({
+      userId,
+      id: dailyNoteEventId,
+      tipo: 'daily_note_submitted',
+      occurredAt,
+      source: 'app',
+      payloadJson: {
+        relato: parsed.data.relato,
+        episodio: resultado.extracao.episodio,
+        eventosClassificados: resultado.extracao.eventosClassificados,
+        fatosCriados,
+        fatosReconfirmados,
+        tokensInput: resultado.tokensInput,
+        tokensOutput: resultado.tokensOutput,
+        custoCentavos: custoCentavos(
+          resultado.tokensInput,
+          resultado.tokensOutput,
+          resultado.modelo
+        ),
+        provider: PROVIDER,
+        modelo: resultado.modelo,
+      },
+    })
+    .onConflictDoNothing({ target: [userTrailEvents.userId, userTrailEvents.id] });
+
+  // 2.5) Persiste episódio com embedding pra retrieval futuro. Só grava se a IA
+  //      considerou que o dia tem peso narrativo (episodio !== null). Falha aqui
+  //      não derruba a resposta — RAG é incremental.
+  let episodioPersistidoId: string | null = null;
+  const ep = resultado.extracao.episodio;
+  if (ep) {
+    try {
+      const textoEmbedding = [
+        ep.titulo,
+        ep.resumo,
+        ep.tags.join(' '),
+        ep.areaSlugs.join(' '),
+        parsed.data.relato,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const embedding = await gerarEmbedding(textoEmbedding);
+      const novoId = randomUUID();
+      await db
+        .insert(userMemoryEpisodes)
+        .values({
+          userId,
+          id: novoId,
+          sourceEventId: dailyNoteEventId,
+          occurredAt,
+          titulo: ep.titulo,
+          resumo: ep.resumo,
+          tags: ep.tags,
+          areaSlugs: ep.areaSlugs,
+          importanceScore: ep.importanceScore,
+          embedding,
+          active: true,
+        })
+        .onConflictDoNothing({ target: [userMemoryEpisodes.userId, userMemoryEpisodes.id] });
+      episodioPersistidoId = novoId;
+    } catch (e) {
+      console.warn('[ai] falha ao persistir episódio com embedding:', e);
     }
   }
 
@@ -184,6 +266,14 @@ aiRoutes.post('/daily-note', async (c) => {
     eventId: dailyNoteEventId,
     extracao: resultado.extracao,
     recomendacoes: recomendacoesComId,
+    episodiosLembrados: episodiosLembrados.map((e) => ({
+      id: e.id,
+      occurredAt: e.occurredAt,
+      titulo: e.titulo,
+      resumo: e.resumo,
+      similaridade: e.similaridade,
+    })),
+    episodioPersistidoId,
     tokensInput: resultado.tokensInput,
     tokensOutput: resultado.tokensOutput,
   });
@@ -313,12 +403,26 @@ aiRoutes.post('/weekly-plan', async (c) => {
     return { resumo, quandoIso: r.occurredAt.toISOString().slice(0, 10) };
   });
 
+  // Retrieval pra plano semanal: query é a concat dos últimos relatos +
+  // intenção declarada — busca episódios passados que ecoam o momento atual.
+  const queryRetrieval = [
+    parsed.data.intencaoDeclarada ?? '',
+    ...ultimosRelatos.map((r) => r.resumo),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  const episodiosLembrados = queryRetrieval
+    ? await retrieveEpisodios(userId, queryRetrieval, { k: 6, minSimilaridade: 0.28 })
+    : [];
+  const blocoHistorico = formatarEpisodiosPraPrompt(episodiosLembrados);
+
   const ctx: ContextoPlanoSemanal = {
     contextoDados: parsed.data.contextoDados,
     fatos: fatosRaw,
     historicoSugestoes,
     ultimosRelatos,
     intencaoDeclarada: parsed.data.intencaoDeclarada,
+    episodiosRelevantes: blocoHistorico || undefined,
   };
 
   let resultado;
@@ -390,6 +494,13 @@ aiRoutes.post('/weekly-plan', async (c) => {
       ...resultado.plano,
       ajustes: ajustesComId,
     },
+    episodiosLembrados: episodiosLembrados.map((e) => ({
+      id: e.id,
+      occurredAt: e.occurredAt,
+      titulo: e.titulo,
+      resumo: e.resumo,
+      similaridade: e.similaridade,
+    })),
     tokensInput: resultado.tokensInput,
     tokensOutput: resultado.tokensOutput,
   });

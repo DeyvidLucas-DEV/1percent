@@ -4,9 +4,28 @@ const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) console.warn('[ai] OPENAI_API_KEY não definida — chamadas de IA vão falhar');
 
 export const MODELO_PADRAO = process.env.AI_MODEL || 'gpt-4o-mini';
+export const MODELO_EMBEDDING = process.env.AI_EMBEDDING_MODEL || 'text-embedding-3-small';
+export const DIMENSAO_EMBEDDING = 1536;
 export const PROVIDER = 'openai';
 
 export const openai = new OpenAI({ apiKey: apiKey ?? '' });
+
+// Gera embedding pra texto (chamada barata: ~$0.02/1M tokens). Trunca em
+// ~30k caracteres pra evitar exceder o limite do modelo (8191 tokens
+// teóricos). Em prática nossos textos têm 1-3k.
+export async function gerarEmbedding(texto: string): Promise<number[]> {
+  const t = texto.length > 30_000 ? texto.slice(0, 30_000) : texto;
+  const r = await openai.embeddings.create({
+    model: MODELO_EMBEDDING,
+    input: t,
+    dimensions: DIMENSAO_EMBEDDING,
+  });
+  const v = r.data[0]?.embedding;
+  if (!v || v.length !== DIMENSAO_EMBEDDING) {
+    throw new Error(`embedding com dimensão inesperada: ${v?.length}`);
+  }
+  return v;
+}
 
 // Custos em USD por 1M tokens (input/output):
 // gpt-4o-mini: 0.15 / 0.60

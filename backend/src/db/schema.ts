@@ -11,6 +11,7 @@ import {
   index,
   boolean,
   jsonb,
+  vector,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -184,6 +185,36 @@ export const userMemoryFacts = pgTable(
     pk: primaryKey({ columns: [t.userId, t.id] }),
     uniqCategoriaChave: uniqueIndex('uniq_facts_user_categoria_chave').on(t.userId, t.categoria, t.chave),
     idxUserCategoria: index('idx_facts_user_categoria').on(t.userId, t.categoria, t.active),
+  })
+);
+
+// Episódios de memória — narrativas curtas geradas pela IA com embedding
+// (text-embedding-3-small, 1536d) pra retrieval por similaridade. Cada
+// daily_note_submitted que produz episódio (importanceScore > 0) gera uma
+// linha aqui. O retrieval é exato (KNN com WHERE user_id) — escala fina
+// pra dezenas/centenas de episódios por usuário; ANN só vira necessário
+// quando passar de ~10k.
+export const userMemoryEpisodes = pgTable(
+  'user_memory_episodes',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    id: uuid('id').notNull(),
+    sourceEventId: uuid('source_event_id').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    titulo: text('titulo').notNull(),
+    resumo: text('resumo').notNull(),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+    areaSlugs: text('area_slugs').array().notNull().default(sql`'{}'::text[]`),
+    importanceScore: real('importance_score').notNull(),
+    embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.id] }),
+    idxUserTime: index('idx_episodes_user_time').on(t.userId, t.occurredAt.desc()),
   })
 );
 

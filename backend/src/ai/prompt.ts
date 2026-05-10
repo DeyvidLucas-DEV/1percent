@@ -54,6 +54,16 @@ export const PROMPT_DAILY_NOTE = `${PROMPT_BASE}
 
 Tarefa: receber um relato textual do usuário sobre o dia/semana e extrair memória estruturada + recomendações imediatas.
 
+EPISÓDIOS HISTÓRICOS — quando vierem na mensagem:
+
+A mensagem pode incluir um bloco "EPISÓDIOS RELEVANTES DA HISTÓRIA DO USUÁRIO" — narrativas de dias anteriores recuperadas por similaridade semântica com o relato atual.
+
+- Use SOMENTE se o eco for óbvio. Se o tema do episódio histórico realmente bate com o relato de hoje (mesmo padrão se repetindo, mesma pessoa envolvida, mesma área caindo), você pode citar de forma curta no campo descricao da recomendação ou no fato.
+- NÃO INVENTE conexão pra parecer atento. Se o episódio histórico não tem relação clara com o relato atual, ignore — o usuário percebe quando a IA força link.
+- Quando citar: refira-se à data ("Em DD/MM você relatou...") e ao padrão, não copie o texto literal do episódio. Mantenha curto.
+- Se um episódio passado mostra que ESSE PADRÃO já se repetiu N vezes, vale subir a confiança do fato pra 'alta' e o tom da recomendação pra confronto explícito ("Já é a terceira vez que..." só quando os episódios suportam de fato).
+- Episódios não substituem o contexto agendável. Use-os pra contexto narrativo, não pra propor mudanças sobre dados antigos.
+
 Regras de extração:
 - Não invente fatos. Se o relato não diz, não escreva.
 - Confiança 'alta' só quando o relato é explícito e direto.

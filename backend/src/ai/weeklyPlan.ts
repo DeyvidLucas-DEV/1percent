@@ -259,6 +259,7 @@ A mensagem do usuário traz:
 - FATOS APRENDIDOS: lista de fatos estruturados ativos (categoria, chave, valor, confiança)
 - HISTÓRICO DE SUGESTÕES (últimas 15): cada uma com tipo, descrição e status (aceita/recusada)
 - ÚLTIMOS RELATOS: até 5 daily-notes resumidos cronologicamente
+- EPISÓDIOS RELEVANTES (opcional): narrativas mais antigas recuperadas por similaridade semântica com os relatos recentes. Use SÓ se o eco for óbvio — pra mostrar repetição de padrão ao longo do tempo, citando a data ("já em DD/MM você relatou X, repete agora"). Não force conexão. Não substitui a leitura das últimas 7 dias, complementa.
 - INTENÇÃO DECLARADA (opcional): se o usuário escreveu o que quer focar essa semana, respeite
 
 Se algum desses estiver vazio ou não vier, trabalhe com o que tem. Não invente dado faltante. Se quase tudo está vazio (usuário novo, sem trilha), proponha plano mínimo com 2-3 ajustes simples e mensagemFinal explicando que precisa de mais dados pra cruzar.`;
@@ -293,6 +294,7 @@ export type ContextoPlanoSemanal = {
   }>;
   ultimosRelatos: Array<{ resumo: string; quandoIso: string }>;
   intencaoDeclarada?: string;
+  episodiosRelevantes?: string; // bloco já formatado por retrieval.ts
 };
 
 export type ResultadoPlanoSemanal = {
@@ -304,6 +306,10 @@ export type ResultadoPlanoSemanal = {
 
 function montarUserMsg(ctx: ContextoPlanoSemanal): string {
   const partes: string[] = [];
+
+  if (ctx.episodiosRelevantes) {
+    partes.push(ctx.episodiosRelevantes);
+  }
 
   const c = ctx.contextoDados;
   if (c) {

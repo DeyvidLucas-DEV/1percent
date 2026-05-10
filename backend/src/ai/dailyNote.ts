@@ -228,9 +228,15 @@ export async function gerarExtracaoMemoria(input: {
   relatoUsuario: string;
   contextoDados?: ContextoDadosUsuario;
   contextoUsuario?: { nome?: string; idade?: number; estadoCivil?: string };
+  episodiosRelevantes?: string;
 }): Promise<ResultadoExtracao> {
   const ctx = input.contextoDados;
   const partes: (string | null)[] = [];
+
+  if (input.episodiosRelevantes) {
+    partes.push(input.episodiosRelevantes);
+    partes.push('');
+  }
 
   if (input.contextoUsuario) {
     partes.push(`Sobre o usuário: ${JSON.stringify(input.contextoUsuario)}`);

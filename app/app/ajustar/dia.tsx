@@ -23,6 +23,8 @@ import { getUser } from '../../src/db/queries/users';
 import { validarSugestaoTarefaIA, type SugestaoTarefaIA } from '../../src/domain/sugestoes';
 import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
 import type { Intensidade } from '../../src/domain/intensidade';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type CriarTarefaPayload = {
   areaSlug: string;
@@ -70,6 +72,14 @@ type EventoClassificado = {
   confianca: 'baixa' | 'media' | 'alta';
 };
 
+type EpisodioLembrado = {
+  id: string;
+  occurredAt: string;
+  titulo: string;
+  resumo: string;
+  similaridade: number;
+};
+
 type RespostaDailyNote = {
   eventId: string;
   extracao: {
@@ -79,6 +89,8 @@ type RespostaDailyNote = {
     recomendacoesImediatas: Recomendacao[];
   };
   recomendacoes: Recomendacao[];
+  episodiosLembrados?: EpisodioLembrado[];
+  episodioPersistidoId?: string | null;
 };
 
 const TIPO_REC_LABEL: Record<Recomendacao['tipo'], string> = {
@@ -392,6 +404,31 @@ export default function ContarOdia() {
                 </View>
               )}
 
+              {resp.episodiosLembrados && resp.episodiosLembrados.length > 0 && (
+                <View style={styles.bloco}>
+                  <Text style={styles.kicker}>EU LEMBREI DISSO</Text>
+                  <Text style={styles.notaFato}>
+                    Já passou algo parecido. Quanto mais episódios similares, mais o padrão se confirma.
+                  </Text>
+                  {resp.episodiosLembrados.map((ep) => (
+                    <View key={ep.id} style={styles.lembrancaCard}>
+                      <View style={styles.eventoCabecalho}>
+                        <Text style={styles.lembrancaData}>
+                          {format(parseISO(ep.occurredAt), "d 'de' MMM", { locale: ptBR })}
+                        </Text>
+                        <View style={styles.confiancaPill}>
+                          <Text style={styles.confiancaPillTxt}>
+                            {Math.round(ep.similaridade * 100)}% similar
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.lembrancaTitulo}>{ep.titulo}</Text>
+                      <Text style={styles.lembrancaResumo}>{ep.resumo}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
               {resp.extracao.fatosCandidatos.length > 0 && (
                 <View style={styles.bloco}>
                   <Text style={styles.kicker}>FATOS APRENDIDOS</Text>
@@ -629,6 +666,29 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   episodioResumo: { color: tema.texto, fontSize: 14, lineHeight: 20 },
+  lembrancaCard: {
+    backgroundColor: tema.bgInput,
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: tema.acento,
+  },
+  lembrancaData: {
+    color: tema.textoFraco,
+    fontSize: 11,
+    fontFamily: tema.fontFamily.textBold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  lembrancaTitulo: {
+    color: tema.texto,
+    fontSize: 14,
+    fontFamily: tema.fontFamily.textBold,
+    marginTop: 6,
+    marginBottom: 3,
+  },
+  lembrancaResumo: { color: tema.textoFraco, fontSize: 13, lineHeight: 18 },
   recCard: {
     backgroundColor: tema.bg,
     padding: 12,
