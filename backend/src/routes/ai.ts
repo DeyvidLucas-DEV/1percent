@@ -13,6 +13,7 @@ import {
 } from '../ai/weeklyPlan.ts';
 import { custoCentavos, gerarEmbedding, MODELO_PADRAO, PROVIDER } from '../ai/cliente.ts';
 import { formatarEpisodiosPraPrompt, retrieveEpisodios } from '../ai/retrieval.ts';
+import { violaBanlist } from '../ai/banlist.ts';
 
 export const aiRoutes = new Hono();
 aiRoutes.use('*', exigirAuth);
@@ -272,9 +273,25 @@ aiRoutes.post('/daily-note', async (c) => {
     }
   }
 
+  // 2.7) Filtro de banlist server-side. gpt-4o-mini reincide em "Reserve",
+  //      "Tempo de qualidade", "momento a sós" etc. mesmo com prompt claro.
+  //      Descarta a rec inteira em vez de tentar reescrever (corre risco de
+  //      quebrar a frase). Loga pra acompanhamento.
+  const recomendacoesValidas = resultado.extracao.recomendacoesImediatas.filter((r) => {
+    const violaDesc = violaBanlist(r.descricao);
+    const violaNome = r.criarTarefa ? violaBanlist(r.criarTarefa.nome) : null;
+    if (violaDesc || violaNome) {
+      console.warn(
+        `[ai] daily-note ${tag}: rejeitou rec "${r.descricao.slice(0, 60)}" — banlist: ${violaDesc ?? violaNome}`
+      );
+      return false;
+    }
+    return true;
+  });
+
   // 3) atribui id às recomendações (pra o app gerar suggestion_accepted/rejected
   //    com payload referenciando esse id) e grava suggestion_presented na trilha.
-  const recomendacoesComId = resultado.extracao.recomendacoesImediatas.map((r) => ({
+  const recomendacoesComId = recomendacoesValidas.map((r) => ({
     id: randomUUID(),
     tipo: r.tipo,
     descricao: r.descricao,
@@ -475,9 +492,33 @@ aiRoutes.post('/weekly-plan', async (c) => {
 
   const agora = new Date();
   const planoEventId = randomUUID();
+  const planoTag = planoEventId.slice(0, 8);
+
+  // Filtro banlist (mesma defesa do daily-note). Aqui checamos descricao,
+  // justificativa, nome de tarefa criada/mudada — tudo que vai virar texto
+  // visível pro usuário.
+  const ajustesValidos = resultado.plano.ajustes.filter((a) => {
+    const checagens: (string | null | undefined)[] = [
+      a.descricao,
+      a.justificativa,
+      a.criarTarefa?.nome,
+      a.mudarTarefa?.nome,
+    ];
+    for (const texto of checagens) {
+      if (!texto) continue;
+      const violou = violaBanlist(texto);
+      if (violou) {
+        console.warn(
+          `[ai] weekly-plan ${planoTag}: rejeitou ajuste "${a.descricao.slice(0, 60)}" — banlist: ${violou}`
+        );
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Atribui UUID a cada ajuste pra app referenciar nos suggestion_accepted/rejected.
-  const ajustesComId = resultado.plano.ajustes.map((a) => ({
+  const ajustesComId = ajustesValidos.map((a) => ({
     id: randomUUID(),
     ...a,
   }));
