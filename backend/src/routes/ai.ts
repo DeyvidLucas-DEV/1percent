@@ -222,6 +222,23 @@ aiRoutes.post('/daily-note', async (c) => {
       // serialização do tipo vector pelo driver/Drizzle. pgvector aceita o
       // formato textual "[x,y,z]".
       const vetorLiteral = `[${embedding.join(',')}]`;
+      // O driver postgres-js expande JS array como tuple (record), por isso
+      // ${arr}::text[] falha com "cannot cast type record to text[]".
+      // Construir ARRAY['a','b']::text[] explicitamente resolve.
+      const tagsExpr =
+        ep.tags.length === 0
+          ? sql`ARRAY[]::text[]`
+          : sql`ARRAY[${sql.join(
+              ep.tags.map((t) => sql`${t}`),
+              sql.raw(',')
+            )}]::text[]`;
+      const areasExpr =
+        ep.areaSlugs.length === 0
+          ? sql`ARRAY[]::text[]`
+          : sql`ARRAY[${sql.join(
+              ep.areaSlugs.map((a) => sql`${a}`),
+              sql.raw(',')
+            )}]::text[]`;
       await db.execute(sql`
         INSERT INTO user_memory_episodes (
           user_id, id, source_event_id, occurred_at, titulo, resumo,
@@ -233,8 +250,8 @@ aiRoutes.post('/daily-note', async (c) => {
           ${occurredAt.toISOString()}::timestamptz,
           ${ep.titulo},
           ${ep.resumo},
-          ${ep.tags}::text[],
-          ${ep.areaSlugs}::text[],
+          ${tagsExpr},
+          ${areasExpr},
           ${ep.importanceScore}::real,
           ${vetorLiteral}::vector,
           true,
