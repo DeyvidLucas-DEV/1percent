@@ -91,6 +91,7 @@ type RespostaDailyNote = {
   recomendacoes: Recomendacao[];
   episodiosLembrados?: EpisodioLembrado[];
   episodioPersistidoId?: string | null;
+  episodioErroPersistencia?: string | null;
 };
 
 const TIPO_REC_LABEL: Record<Recomendacao['tipo'], string> = {
@@ -385,6 +386,15 @@ export default function ContarOdia() {
 
           {resp && (
             <>
+              {resp.episodioErroPersistencia && (
+                <View style={[styles.bloco, { borderColor: tema.perigo, borderWidth: 1 }]}>
+                  <Text style={styles.kicker}>FALHA AO SALVAR EPISÓDIO (DEBUG)</Text>
+                  <Text selectable style={{ color: tema.perigo, fontSize: 12, lineHeight: 17 }}>
+                    {resp.episodioErroPersistencia}
+                  </Text>
+                </View>
+              )}
+
               {resp.extracao.eventosClassificados.length > 0 && (
                 <View style={styles.bloco}>
                   <Text style={styles.kicker}>LEITURA DIRETA</Text>

@@ -195,8 +195,10 @@ aiRoutes.post('/daily-note', async (c) => {
 
   // 2.5) Persiste episódio com embedding pra retrieval futuro. Só grava se a IA
   //      considerou que o dia tem peso narrativo (episodio !== null). Falha aqui
-  //      não derruba a resposta — RAG é incremental.
+  //      não derruba a resposta — RAG é incremental. Em caso de falha, devolve
+  //      o motivo no campo episodioErroPersistencia pra diagnostico no app.
   let episodioPersistidoId: string | null = null;
+  let episodioErroPersistencia: string | null = null;
   const ep = resultado.extracao.episodio;
   const tag = dailyNoteEventId.slice(0, 8);
   console.log(
@@ -216,26 +218,40 @@ aiRoutes.post('/daily-note', async (c) => {
         .join('\n');
       const embedding = await gerarEmbedding(textoEmbedding);
       const novoId = randomUUID();
-      await db
-        .insert(userMemoryEpisodes)
-        .values({
-          userId,
-          id: novoId,
-          sourceEventId: dailyNoteEventId,
-          occurredAt,
-          titulo: ep.titulo,
-          resumo: ep.resumo,
-          tags: ep.tags,
-          areaSlugs: ep.areaSlugs,
-          importanceScore: ep.importanceScore,
-          embedding,
-          active: true,
-        })
-        .onConflictDoNothing({ target: [userMemoryEpisodes.userId, userMemoryEpisodes.id] });
+      // Usa SQL bruto com cast explícito ::vector. Evita qualquer falha de
+      // serialização do tipo vector pelo driver/Drizzle. pgvector aceita o
+      // formato textual "[x,y,z]".
+      const vetorLiteral = `[${embedding.join(',')}]`;
+      await db.execute(sql`
+        INSERT INTO user_memory_episodes (
+          user_id, id, source_event_id, occurred_at, titulo, resumo,
+          tags, area_slugs, importance_score, embedding, active, created_at
+        ) VALUES (
+          ${userId}::uuid,
+          ${novoId}::uuid,
+          ${dailyNoteEventId}::uuid,
+          ${occurredAt.toISOString()}::timestamptz,
+          ${ep.titulo},
+          ${ep.resumo},
+          ${ep.tags}::text[],
+          ${ep.areaSlugs}::text[],
+          ${ep.importanceScore}::real,
+          ${vetorLiteral}::vector,
+          true,
+          NOW()
+        )
+        ON CONFLICT (user_id, id) DO NOTHING
+      `);
       episodioPersistidoId = novoId;
       console.log(`[ai] daily-note ${tag}: episodio persistido id=${novoId.slice(0, 8)}`);
     } catch (e) {
-      console.error(`[ai] daily-note ${tag}: FALHA ao persistir episodio:`, e);
+      const detail =
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      episodioErroPersistencia = detail;
+      console.error(
+        `[ai] daily-note ${tag}: FALHA ao persistir episodio:`,
+        e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : e
+      );
     }
   }
 
@@ -280,6 +296,7 @@ aiRoutes.post('/daily-note', async (c) => {
       similaridade: e.similaridade,
     })),
     episodioPersistidoId,
+    episodioErroPersistencia,
     tokensInput: resultado.tokensInput,
     tokensOutput: resultado.tokensOutput,
   });
