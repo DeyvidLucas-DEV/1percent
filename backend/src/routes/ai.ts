@@ -11,7 +11,7 @@ import {
   gerarPlanoSemanal,
   type ContextoPlanoSemanal,
 } from '../ai/weeklyPlan.ts';
-import { custoCentavos, gerarEmbedding, MODELO_PADRAO, PROVIDER } from '../ai/cliente.ts';
+import { custoCentavos, gerarEmbedding, MODELO_PADRAO, openai, PROVIDER } from '../ai/cliente.ts';
 import { formatarEpisodiosPraPrompt, retrieveEpisodios } from '../ai/retrieval.ts';
 import { violaBanlist } from '../ai/banlist.ts';
 
@@ -584,5 +584,98 @@ aiRoutes.post('/weekly-plan', async (c) => {
     })),
     tokensInput: resultado.tokensInput,
     tokensOutput: resultado.tokensOutput,
+  });
+});
+
+// ─── /transcribe ────────────────────────────────────────────────────
+// Recebe áudio do app (m4a, mp3, wav), envia pra Whisper em PT-BR,
+// devolve texto + duração. O app exibe o texto editável antes do
+// usuário disparar /daily-note. Custo: $0.006/min (~0.6 centavo/min).
+// Grava evento voice_note_transcribed na trilha pro histórico.
+
+aiRoutes.post('/transcribe', async (c) => {
+  const userId = c.get('userId');
+
+  const limite = await reservarChamadaIa(userId);
+  if (!limite.permitido) {
+    return c.json(
+      {
+        error: 'rate_limited',
+        bucket: limite.bucket,
+        max: limite.max,
+        resetEm: limite.resetEm.toISOString(),
+      },
+      429
+    );
+  }
+
+  let arquivo: File | null = null;
+  try {
+    const body = await c.req.parseBody();
+    const f = body['audio'];
+    if (f instanceof File) arquivo = f;
+  } catch (e) {
+    return c.json({ error: 'multipart_invalido', detail: String(e) }, 400);
+  }
+
+  if (!arquivo) {
+    return c.json({ error: 'arquivo_audio_ausente' }, 400);
+  }
+
+  // Whisper aceita até 25MB. App não deve passar disso (relato curto
+  // gera arquivos << 1MB), mas validamos defensivamente.
+  if (arquivo.size > 25 * 1024 * 1024) {
+    return c.json({ error: 'arquivo_muito_grande', tamanho: arquivo.size }, 413);
+  }
+
+  let resposta;
+  try {
+    resposta = await openai.audio.transcriptions.create({
+      file: arquivo,
+      model: 'whisper-1',
+      language: 'pt',
+      response_format: 'verbose_json',
+    });
+  } catch (e) {
+    console.error('[ai] falha em /transcribe', e);
+    return c.json({ error: 'falha_ia', detail: String(e) }, 502);
+  }
+
+  // verbose_json devolve { text, duration, language, segments[] }.
+  const texto = (resposta as { text?: string }).text ?? '';
+  const duracaoSegundos = (resposta as { duration?: number }).duration ?? 0;
+  const custoCent = Math.ceil((duracaoSegundos / 60) * 0.6 * 100) / 100;
+
+  // Trilha: evento voice_note_transcribed (informativo).
+  const eventoId = randomUUID();
+  const agora = new Date();
+  await db
+    .insert(userTrailEvents)
+    .values({
+      userId,
+      id: eventoId,
+      tipo: 'voice_note_transcribed',
+      occurredAt: agora,
+      source: 'app',
+      payloadJson: {
+        duracaoSegundos,
+        tamanhoBytes: arquivo.size,
+        custoCentavos: custoCent,
+        provider: PROVIDER,
+        modelo: 'whisper-1',
+        textoPrefixo: texto.slice(0, 80),
+      },
+    })
+    .onConflictDoNothing({ target: [userTrailEvents.userId, userTrailEvents.id] });
+
+  console.log(
+    `[ai] transcribe ${eventoId.slice(0, 8)}: ${duracaoSegundos.toFixed(1)}s, ${texto.length} chars, ~${custoCent} centavos`
+  );
+
+  return c.json({
+    eventId: eventoId,
+    texto,
+    duracaoSegundos,
+    custoCentavos: custoCent,
   });
 });

@@ -25,6 +25,13 @@ import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
 import type { Intensidade } from '../../src/domain/intensidade';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  AudioModule,
+  RecordingPresets,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
 
 type CriarTarefaPayload = {
   areaSlug: string;
@@ -130,12 +137,22 @@ const CATEGORIA_LABEL: Record<string, string> = {
   sabedoria: 'Sabedoria',
 };
 
+function formatarDuracao(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export default function ContarOdia() {
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [resp, setResp] = useState<RespostaDailyNote | null>(null);
   const [statusRec, setStatusRec] = useState<Record<string, 'pendente' | 'aceita' | 'recusada'>>({});
+  const [transcrevendo, setTranscrevendo] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recState = useAudioRecorderState(audioRecorder, 500);
   const [contexto, setContexto] = useState<{
     percentualGeral7d: number;
     areasFortes: string[];
@@ -201,6 +218,57 @@ export default function ContarOdia() {
       alive = false;
     };
   }, []);
+
+  const alternarGravacao = useCallback(async () => {
+    try {
+      if (recState.isRecording) {
+        // Parar e transcrever
+        await audioRecorder.stop();
+        const uri = audioRecorder.uri;
+        if (!uri) {
+          Alert.alert('Sem áudio', 'Nada foi gravado.');
+          return;
+        }
+        setTranscrevendo(true);
+        const form = new FormData();
+        // React Native FormData aceita { uri, name, type } no campo file.
+        // Whisper aceita m4a; expo-audio HIGH_QUALITY grava m4a no iOS.
+        // @ts-expect-error — FormData do RN aceita objeto descritor
+        form.append('audio', { uri, name: 'relato.m4a', type: 'audio/m4a' });
+        const r = await api.upload<{ texto: string; duracaoSegundos: number }>(
+          '/ai/transcribe',
+          form
+        );
+        // Append ao texto existente em vez de substituir — usuário pode ter
+        // escrito algo antes ou querer concatenar várias gravações.
+        setTexto((atual) => (atual.trim() ? atual.trim() + ' ' + r.texto : r.texto));
+      } else {
+        // Iniciar
+        const perm = await AudioModule.requestRecordingPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            'Microfone bloqueado',
+            'Vai em Ajustes do iPhone > 1% > Microfone pra liberar.'
+          );
+          return;
+        }
+        await AudioModule.setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
+        await audioRecorder.prepareToRecordAsync();
+        audioRecorder.record();
+      }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        Alert.alert('Erro', `status ${e.status}`);
+      } else {
+        Alert.alert('Falha', String(e));
+      }
+    } finally {
+      setTranscrevendo(false);
+    }
+  }, [audioRecorder, recState.isRecording]);
 
   const enviar = useCallback(async () => {
     const t = texto.trim();
@@ -368,9 +436,38 @@ export default function ContarOdia() {
               </View>
 
               <Pressable
-                style={[styles.botao, enviando && { opacity: 0.6 }]}
+                style={[
+                  styles.botaoGravar,
+                  recState.isRecording && styles.botaoGravando,
+                  (enviando || transcrevendo) && { opacity: 0.6 },
+                ]}
+                onPress={alternarGravacao}
+                disabled={enviando || transcrevendo}
+              >
+                {transcrevendo ? (
+                  <>
+                    <ActivityIndicator color={tema.texto} />
+                    <Text style={styles.botaoGravarTxt}>Transcrevendo…</Text>
+                  </>
+                ) : recState.isRecording ? (
+                  <>
+                    <Ionicons name="stop-circle" size={20} color="#F5F1E5" />
+                    <Text style={[styles.botaoGravarTxt, { color: '#F5F1E5' }]}>
+                      Gravando {formatarDuracao(recState.durationMillis)} — toque pra parar
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="mic" size={20} color={tema.texto} />
+                    <Text style={styles.botaoGravarTxt}>Gravar relato por voz</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={[styles.botao, (enviando || recState.isRecording) && { opacity: 0.6 }]}
                 onPress={enviar}
-                disabled={enviando}
+                disabled={enviando || recState.isRecording || transcrevendo}
               >
                 {enviando ? (
                   <ActivityIndicator color="#F5F1E5" />
@@ -612,6 +709,29 @@ const styles = StyleSheet.create({
     color: '#F5F1E5',
     fontFamily: tema.fontFamily.textBold,
     fontSize: 16,
+  },
+  botaoGravar: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: tema.bgCard,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  botaoGravando: {
+    backgroundColor: tema.perigo,
+    borderColor: tema.perigo,
+  },
+  botaoGravarTxt: {
+    color: tema.texto,
+    fontFamily: tema.fontFamily.textBold,
+    fontSize: 14,
   },
   aviso: {
     paddingHorizontal: 24,

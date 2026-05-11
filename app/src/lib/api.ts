@@ -31,10 +31,27 @@ async function request<T>(
   return payload as T;
 }
 
+async function uploadMultipart<T>(rota: string, formData: FormData): Promise<T> {
+  const sessao = await lerSessao();
+  if (!sessao) throw new ApiError(401, null, 'sem_sessao');
+  // Não setar Content-Type — fetch define com o boundary correto.
+  const r = await fetch(`${BACKEND_URL}${rota}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sessao.jwt}` },
+    body: formData,
+  });
+  const text = await r.text();
+  let payload: unknown = null;
+  try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
+  if (!r.ok) throw new ApiError(r.status, payload, `POST ${rota} → ${r.status}`);
+  return payload as T;
+}
+
 export const api = {
   get: <T>(rota: string) => request<T>('GET', rota),
   post: <T>(rota: string, body?: unknown, exigeAuth = true) =>
     request<T>('POST', rota, body, exigeAuth),
   patch: <T>(rota: string, body?: unknown) => request<T>('PATCH', rota, body),
   del: <T>(rota: string) => request<T>('DELETE', rota),
+  upload: <T>(rota: string, formData: FormData) => uploadMultipart<T>(rota, formData),
 };
