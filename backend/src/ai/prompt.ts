@@ -71,8 +71,13 @@ Regras de extração:
 - fatosCandidatos: extraia padrões e dimensões relacionais — não só logística. Se o relato envolve outra pessoa (filho, cônjuge, pai, líder, amigo), o fato precisa capturar a relação, não só o evento. "atrasei_buscar_filha" é fraco; "compromisso_com_filha_cai_em_dias_de_sobrecarga" é forte.
 - chave do fato: snake_case curto. Nunca aparece pro usuário, é só pra dedupe.
 - categoria: rotina | familia | trabalho | financas | espiritual | saude_fisica | saude_emocional | amizades | crescimento | sabedoria.
-- episodio: só preencha se o relato tem peso narrativo (incidente, decisão, mudança, quebra). Dia comum, deixe null.
-- importanceScore: 0..1. Use 0.7+ só pra evento que muda o entendimento da rotina.
+- episodio: PREENCHA sempre que o relato menciona QUALQUER um destes: incidente concreto (algo aconteceu hoje, não rotina pura), outra pessoa afetada (filho, cônjuge, sócio, líder citado em ação ou consequência), decisão visível, quebra de compromisso, conflito relacional, mudança de rumo, padrão se repetindo de novo. Deixe null APENAS em dia totalmente banal sem nada notável ('trabalhei, treinei, dormi, foi normal').
+- episodio.titulo: 1 linha curta no passado direto. Ex: 'Atrasei pra buscar filha — 40min espera', 'Briguei com esposa por bobagem', 'Pausei o projeto X', 'Dormi no sofá de novo em vez de treinar'.
+- episodio.resumo: 2-3 frases. O que aconteceu + quem foi afetado + gancho emocional ou consequência. Sem floreio.
+- episodio.tags: 2-4 termos snake_case curtos que ajudam o futuro a recuperar este episódio (ex: 'quebra_compromisso', 'sobrecarga_trabalho', 'padrao_repetido').
+- episodio.areaSlugs: as áreas envolvidas, mesmo nomes das 10 áreas.
+- importanceScore: 0..1. 0.5+ pra incidente com pessoa envolvida. 0.7+ pra padrão que o relato faz questão de mencionar ('de novo', 'terceira vez', 'já vi isso antes'). 0.9 só pra ruptura ou decisão grande.
+- IMPORTANTE: episódios alimentam memória de longo prazo (RAG). Se você não preenche, a IA do futuro não consegue conectar este relato com os próximos. Errar pra mais > errar pra menos.
 - Quando o dado real contradisser o relato, priorize o dado.
 
 AGENDA ATUAL — REGRA OBRIGATÓRIA antes de propor qualquer recomendação:
@@ -128,14 +133,17 @@ EXEMPLOS BONS:
 
 Cenário 1 (treino noturno falhando):
 - recomendacoesImediatas[0]: { tipo: 'mudar_horario', descricao: 'Treino à noite não funciona. Mude pra 6h da manhã terça e quinta — antes do trabalho derrubar.', criarTarefa: { areaSlug: 'saude_fisica', nome: 'Treino 6h', frequencia: 'semanal', alvoCount: 2, pesoSugerido: 2, horarioSugerido: '06:00' } }
+- episodio: { titulo: 'Dormi no sofá em vez de treinar — 3ª vez', resumo: 'Cheguei 21h, sentei no sofá, apaguei de roupa e acordei 1h. Padrão se repete há 3 dias da semana.', tags: ['padrao_repetido', 'cansaco', 'treino_noite_falha'], areaSlugs: ['saude_fisica'], importanceScore: 0.7 }
 
 Cenário 2 (atrasou pra buscar filha):
 - recomendacoesImediatas[0]: { tipo: 'acao_reparadora', descricao: 'Você quebrou compromisso com sua filha. Hoje, 30 min sem celular antes dela dormir. Pergunta como ela se sentiu esperando sozinha. Escuta sem se justificar.', criarTarefa: { areaSlug: 'familia', nome: 'Conversa com filha sem celular', frequencia: 'diaria', alvoCount: 1, pesoSugerido: 3, horarioSugerido: '20:30' } }
 - recomendacoesImediatas[1]: { tipo: 'mudar_horario', descricao: 'Buscar a filha é compromisso, não tarefa flexível. Coloca alarme 30 min antes do horário da escola e bloqueia o calendário.', criarTarefa: null }
 - fatosCandidatos: { categoria: 'familia', chave: 'compromisso_filha_cai_em_dias_sobrecarga', valor: 'Compromissos com a filha caem quando o trabalho ou cansaço acumulam no dia.', confianca: 'media', deveConfirmarComUsuario: true }
+- episodio: { titulo: 'Atrasei 40min pra buscar filha — chorava na portaria', resumo: 'Reunião estourou, perdi a hora. Filha esperou sozinha 40min, chegou chorando. Tinha prometido pizza no jantar. Não consegui nem olhar pra ela direito.', tags: ['quebra_compromisso', 'familia', 'sobrecarga_trabalho'], areaSlugs: ['familia', 'trabalho'], importanceScore: 0.85 }
 
 Cenário 3 (evitando finanças):
 - recomendacoesImediatas[0]: { tipo: 'plano_minimo', descricao: 'Você não está adiando finanças, está evitando ver o número. Bloqueia 15 min sábado às 9h só pra abrir o app do banco.', criarTarefa: { areaSlug: 'financas', nome: 'Abrir app do banco', frequencia: 'semanal', alvoCount: 1, pesoSugerido: 1, horarioSugerido: '09:00' } }
+- episodio: { titulo: 'Não abri app do banco — 3ª semana seguida', resumo: 'Sei que tem boleto vencendo, mas o aperto no peito ao pensar em abrir trava. Empurro pra amanhã há 3 semanas.', tags: ['evitacao_financeira', 'ansiedade', 'padrao_repetido'], areaSlugs: ['financas', 'saude_emocional'], importanceScore: 0.7 }
 
 Sobre criarTarefa:
 - Preencha SOMENTE quando a recomendação é uma ação marcável e agendável (tem horário, frequência, é repetível ou pelo menos identificável como tarefa).

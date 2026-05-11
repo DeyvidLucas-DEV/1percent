@@ -198,6 +198,11 @@ aiRoutes.post('/daily-note', async (c) => {
   //      não derruba a resposta — RAG é incremental.
   let episodioPersistidoId: string | null = null;
   const ep = resultado.extracao.episodio;
+  const tag = dailyNoteEventId.slice(0, 8);
+  console.log(
+    `[ai] daily-note ${tag}: retrieve achou ${episodiosLembrados.length} episódios | ` +
+      `ia decidiu episodio=${ep ? `"${ep.titulo}" importance=${ep.importanceScore}` : 'null'}`
+  );
   if (ep) {
     try {
       const textoEmbedding = [
@@ -228,8 +233,9 @@ aiRoutes.post('/daily-note', async (c) => {
         })
         .onConflictDoNothing({ target: [userMemoryEpisodes.userId, userMemoryEpisodes.id] });
       episodioPersistidoId = novoId;
+      console.log(`[ai] daily-note ${tag}: episodio persistido id=${novoId.slice(0, 8)}`);
     } catch (e) {
-      console.warn('[ai] falha ao persistir episódio com embedding:', e);
+      console.error(`[ai] daily-note ${tag}: FALHA ao persistir episodio:`, e);
     }
   }
 
