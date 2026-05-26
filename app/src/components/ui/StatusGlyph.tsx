@@ -1,5 +1,6 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tema } from '../../lib/tema';
+import { base } from '../../lib/paleta';
 
 export type StatusVisual = 'open' | 'done' | 'half' | 'fail';
 
@@ -13,7 +14,7 @@ export function StatusGlyph({ status, size = 22 }: Props) {
         <Path
           d="M6 11.5 L9.5 15 L16 7.5"
           fill="none"
-          stroke="#fff"
+          stroke={base.branco}
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"

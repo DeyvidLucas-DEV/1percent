@@ -5,6 +5,8 @@ import { tema } from '../src/lib/tema';
 import { listarAreas } from '../src/db/queries/areas';
 import { listarTarefasAtivas, execucoesDoDia, marcarExecucao, removerExecucao } from '../src/db/queries/tarefas';
 import { hojeIso } from '../src/lib/datas';
+import { feedbackStatus } from '../src/lib/haptics';
+import { PunchOnChange } from '../src/components/ui/PunchOnChange';
 import type { Area, Tarefa, StatusExecucao } from '../src/db/types';
 
 type LinhaTarefa = Tarefa & { status: StatusExecucao | null };
@@ -31,12 +33,14 @@ export default function Checklist() {
       t.status === 'concluido' ? 'parcial' :
       t.status === 'parcial'   ? 'nao_feito' :
                                  null;
+    // Otimismo: muda local primeiro pra animação e haptic dispararem antes do DB.
+    feedbackStatus(proximo);
+    setTarefas(prev => prev.map(x => x.id === t.id ? { ...x, status: proximo } : x));
     if (proximo === null) {
       await removerExecucao(t.id, hojeIso());
     } else {
       await marcarExecucao(t.id, proximo, hojeIso());
     }
-    await carregar();
   }
 
   return (
@@ -60,9 +64,11 @@ export default function Checklist() {
                   t.status === 'nao_feito' && styles.tarefaNao,
                 ]}
               >
-                <View style={[styles.checkbox, statusEstilo(t.status)]}>
-                  <Text style={styles.checkTxt}>{statusIcone(t.status)}</Text>
-                </View>
+                <PunchOnChange trigger={t.status}>
+                  <View style={[styles.checkbox, statusEstilo(t.status)]}>
+                    <Text style={styles.checkTxt}>{statusIcone(t.status)}</Text>
+                  </View>
+                </PunchOnChange>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tarefaNome}>{t.nome}</Text>
                   <Text style={styles.tarefaSub}>
@@ -130,7 +136,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: tema.bgInput,
   },
-  checkTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  checkTxt: { color: tema.acentoTexto, fontSize: 16, fontWeight: '800' },
   tarefaNome: { color: tema.texto, fontSize: tema.fonte.corpo },
   tarefaSub: { color: tema.textoFraco, fontSize: 12, marginTop: 2 },
   legenda: { marginTop: tema.espacamento.md, padding: tema.espacamento.sm },

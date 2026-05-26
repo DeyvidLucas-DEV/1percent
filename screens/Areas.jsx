@@ -1,228 +1,198 @@
-// Areas.jsx — Aba Áreas + Alvo de Vida + Detalhe da Área
+// Areas.jsx — Aba Áreas + Detalhe + Alvo de Vida (light/pastel)
 
-const AREAS_DATA_GOOD = [
-  { area: AREAS.espiritual,  pctDay: 80, pct7d: 72 },
-  { area: AREAS.fisica,      pctDay: 92, pct7d: 78 },
-  { area: AREAS.familia,     pctDay: 70, pct7d: 65 },
-  { area: AREAS.trabalho,    pctDay: 75, pct7d: 80 },
-  { area: AREAS.emocional,   pctDay: 60, pct7d: 55 },
-  { area: AREAS.financas,    pctDay: 88, pct7d: 70 },
-  { area: AREAS.ministerio,  pctDay: 50, pct7d: 60 },
-  { area: AREAS.amizades,    pctDay: 40, pct7d: 45 },
-  { area: AREAS.intelectual, pctDay: 70, pct7d: 62 },
-  { area: AREAS.sabedoria,   pctDay: 55, pct7d: 50 },
+const AREAS_DATA = [
+  { area: AREAS.espiritual,  pct: 72, habits: 3 },
+  { area: AREAS.fisica,      pct: 88, habits: 4 },
+  { area: AREAS.familia,     pct: 65, habits: 3 },
+  { area: AREAS.trabalho,    pct: 80, habits: 5 },
+  { area: AREAS.emocional,   pct: 55, habits: 2 },
+  { area: AREAS.financas,    pct: 70, habits: 2 },
+  { area: AREAS.ministerio,  pct: 60, habits: 2 },
+  { area: AREAS.amizades,    pct: 45, habits: 2 },
+  { area: AREAS.intelectual, pct: 62, habits: 3 },
+  { area: AREAS.sabedoria,   paused: true },
 ];
 
-const AREAS_DATA_BAD = [
-  { area: AREAS.espiritual,  pctDay: 0,  pct7d: 18 },
-  { area: AREAS.fisica,      pctDay: 0,  pct7d: 22 },
-  { area: AREAS.familia,     pctDay: 33, pct7d: 30 },
-  { area: AREAS.trabalho,    pctDay: 25, pct7d: 35 },
-  { area: AREAS.emocional,   pctDay: 0,  pct7d: 12 },
-  { area: AREAS.financas,    pctDay: 50, pct7d: 40 },
-  { area: AREAS.ministerio,  paused: true },
-  { area: AREAS.amizades,    pctDay: 0,  pct7d: 8 },
-  { area: AREAS.intelectual, pctDay: 0,  pct7d: 15 },
-  { area: AREAS.sabedoria,   pctDay: 0,  pct7d: 20 },
-];
-
-function AreaCard({ area, pctDay, pct7d, paused }) {
+// Card linha grande, estilo "Drink water" com chevron à direita
+function AreaRow({ area, pct, habits, paused }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'stretch',
-      background: T.card, borderRadius: 14,
-      border: `0.5px solid ${T.border}`, overflow: 'hidden',
-      opacity: paused ? 0.45 : 1,
+    <WaveCard bg={paused ? '#E5E0D2' : area.soft} style={{
+      padding: '0 0 18px', opacity: paused ? 0.55 : 1,
     }}>
-      <div style={{ width: 4, background: area.color }}/>
       <div style={{
-        flex: 1, padding: '14px 16px',
-        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '18px 20px 0',
+        display: 'flex', alignItems: 'center', gap: 14,
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: T.text }}>
-            {area.name}
-          </div>
+        <div style={{
+          width: 38, height: 38, borderRadius: 19,
+          background: 'rgba(255,255,255,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ width: 14, height: 14, borderRadius: 7, background: area.ink }}/>
+        </div>
+        <div style={{ flex: 1 }}>
           <div style={{
-            marginTop: 4, fontSize: 12, color: T.weak,
-            display: 'flex', gap: 10, fontVariantNumeric: 'tabular-nums',
-          }}>
-            {paused ? (
-              <span style={{ color: T.warn, fontWeight: 600,
-                textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 11 }}>
-                Pausada
-              </span>
-            ) : (
-              <>
-                <span>{pctDay}% dia</span>
-                <span style={{ color: '#5a5e6a' }}>·</span>
-                <span>{pct7d}% 7d</span>
-              </>
-            )}
+            fontFamily: T.fontDisplay, fontSize: 18, fontWeight: 700,
+            color: T.ink, letterSpacing: -0.2,
+          }}>{area.name}</div>
+          <div style={{ fontSize: 12, color: T.weak, marginTop: 2,
+            fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
+            {paused ? 'Pausada' : `${habits} hábitos · ${pct}% essa semana`}
           </div>
         </div>
-        {!paused && <MiniRing pct={pctDay} baseColor={area.color}/>}
-        {!paused && (
-          <svg width="8" height="14" viewBox="0 0 8 14" style={{ marginLeft: 4 }}>
-            <path d="M1 1 L7 7 L1 13" fill="none" stroke={T.weak} strokeWidth="1.5"
-              strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
-          </svg>
-        )}
+        {!paused && <MiniRing pct={pct} color={area.ink} size={42} stroke={5}/>}
+        <svg width="10" height="16" viewBox="0 0 10 16">
+          <path d="M2 2 L8 8 L2 14" fill="none" stroke={T.ink} strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round" opacity="0.4"/>
+        </svg>
       </div>
-    </div>
+    </WaveCard>
   );
 }
 
 function ScreenAreas({ state = 'good' }) {
-  const data = state === 'good' ? AREAS_DATA_GOOD : AREAS_DATA_BAD;
+  const data = state === 'bad' ? AREAS_DATA.map(d => ({
+    ...d, pct: d.paused ? undefined : Math.max(0, (d.pct||0) - 50),
+  })) : AREAS_DATA;
   return (
     <Screen tab="areas">
-      <PageHeader kicker="suas dimensões" title="Áreas"/>
+      <PageHeader greeting="Suas" name="10 áreas" right={
+        <IconBtn>
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path d="M8 3 V13 M3 8 H13" stroke={T.ink} strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        </IconBtn>
+      }/>
 
       {/* Botão Alvo de Vida */}
-      <div style={{ padding: '14px 16px 18px' }}>
+      <div style={{ padding: '0 16px 20px' }}>
         <div style={{
-          background: T.card, borderRadius: 14,
-          border: `0.5px solid ${T.border}`,
-          padding: '14px 18px',
+          background: T.ink, color: T.bg,
+          borderRadius: 22, padding: '16px 18px',
           display: 'flex', alignItems: 'center', gap: 14,
         }}>
           <svg width="36" height="36" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="16" fill="none" stroke={T.border} strokeWidth="1"/>
-            {[0,1,2,3,4,5,6,7,8,9].map(i => {
-              const a = (i * 36 - 90) * Math.PI/180;
-              return <line key={i} x1="18" y1="18"
-                x2={18 + Math.cos(a)*16} y2={18 + Math.sin(a)*16}
-                stroke={T.border} strokeWidth="0.5"/>;
-            })}
-            <circle cx="18" cy="18" r="2" fill={T.accent}/>
+            <circle cx="18" cy="18" r="15" fill="none" stroke={T.bg} strokeWidth="1" opacity="0.4"/>
+            <circle cx="18" cy="18" r="10" fill="none" stroke={T.bg} strokeWidth="1" opacity="0.5"/>
+            <circle cx="18" cy="18" r="5" fill="none" stroke={T.bg} strokeWidth="1" opacity="0.7"/>
+            <circle cx="18" cy="18" r="2" fill={T.bg}/>
           </svg>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>
+            <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 700 }}>
               Alvo de Vida
             </div>
-            <div style={{ fontSize: 12, color: T.weak, marginTop: 2 }}>
+            <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>
               Visão geral em 10 fatias
             </div>
           </div>
-          <svg width="8" height="14" viewBox="0 0 8 14">
-            <path d="M1 1 L7 7 L1 13" fill="none" stroke={T.weak} strokeWidth="1.5"
+          <svg width="10" height="16" viewBox="0 0 10 16">
+            <path d="M2 2 L8 8 L2 14" fill="none" stroke={T.bg} strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
       </div>
 
-      {/* Lista das 10 áreas */}
-      <div style={{
-        padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8,
-      }}>
-        {data.map((d, i) => <AreaCard key={i} {...d}/>)}
+      <div style={{ padding: '0 16px',
+        display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.map((d, i) => <AreaRow key={i} {...d}/>)}
       </div>
     </Screen>
   );
 }
 
-// ─── Alvo de Vida (pizza/donut de 10 fatias) ───
+// ─── Alvo de Vida (pizza 10 fatias, light) ───
 function AlvoPizza({ data, size = 320 }) {
   const cx = size/2, cy = size/2;
-  const outerR = size/2 - 8;
-  const minR = 30;
+  const outerR = size/2 - 10;
+  const minR = 32;
   const slices = 10;
-
   return (
     <svg width={size} height={size}>
-      {/* trilha externa marcada por área */}
       {data.map((d, i) => {
         const a0 = (i / slices) * 2 * Math.PI - Math.PI/2;
         const a1 = ((i + 1) / slices) * 2 * Math.PI - Math.PI/2;
-        const fillR = d.paused ? minR : minR + (outerR - minR) * (d.pctDay || 0) / 100;
-        const faixaC = d.paused ? T.input : faixaFor(d.pctDay).color;
+        const fillR = d.paused ? minR + 4 : minR + (outerR - minR) * (d.pct||0) / 100;
 
-        // arc path (anel preenchido até fillR)
         const x0o = cx + Math.cos(a0)*fillR, y0o = cy + Math.sin(a0)*fillR;
         const x1o = cx + Math.cos(a1)*fillR, y1o = cy + Math.sin(a1)*fillR;
         const x0i = cx + Math.cos(a0)*minR, y0i = cy + Math.sin(a0)*minR;
         const x1i = cx + Math.cos(a1)*minR, y1i = cy + Math.sin(a1)*minR;
         const path = `M ${x0i} ${y0i} L ${x0o} ${y0o} A ${fillR} ${fillR} 0 0 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${minR} ${minR} 0 0 0 ${x0i} ${y0i} Z`;
 
-        // borda externa (cor base da área)
+        // Trilha externa
         const xb0 = cx + Math.cos(a0)*outerR, yb0 = cy + Math.sin(a0)*outerR;
         const xb1 = cx + Math.cos(a1)*outerR, yb1 = cy + Math.sin(a1)*outerR;
-        const borderPath = `M ${xb0} ${yb0} A ${outerR} ${outerR} 0 0 1 ${xb1} ${yb1}`;
+        const trilha = `M ${cx + Math.cos(a0)*minR} ${cy + Math.sin(a0)*minR}
+          L ${xb0} ${yb0} A ${outerR} ${outerR} 0 0 1 ${xb1} ${yb1}
+          L ${cx + Math.cos(a1)*minR} ${cy + Math.sin(a1)*minR}
+          A ${minR} ${minR} 0 0 0 ${cx + Math.cos(a0)*minR} ${cy + Math.sin(a0)*minR} Z`;
 
         return (
           <g key={i}>
-            <path d={path} fill={faixaC} opacity={d.paused ? 0.4 : 1}/>
-            <path d={borderPath} fill="none" stroke={d.area.color} strokeWidth="3" strokeLinecap="butt"/>
+            <path d={trilha} fill={d.area.soft} opacity="0.5"/>
+            <path d={path} fill={d.area.ink} opacity={d.paused ? 0.25 : 0.92}/>
             <line x1={cx + Math.cos(a0)*minR} y1={cy + Math.sin(a0)*minR}
               x2={cx + Math.cos(a0)*outerR} y2={cy + Math.sin(a0)*outerR}
-              stroke={T.bg} strokeWidth="1"/>
+              stroke={T.bg} strokeWidth="2"/>
           </g>
         );
       })}
-      {/* círculo central */}
       <circle cx={cx} cy={cy} r={minR-2} fill={T.bg}/>
-      <circle cx={cx} cy={cy} r={minR-2} fill="none" stroke={T.border} strokeWidth="0.5"/>
     </svg>
   );
 }
 
 function ScreenAlvo({ state = 'good' }) {
-  const data = state === 'good' ? AREAS_DATA_GOOD : AREAS_DATA_BAD;
-  const total = Math.round(
-    data.filter(d => !d.paused).reduce((s,d) => s + (d.pctDay || 0), 0)
-    / data.filter(d => !d.paused).length
-  );
-  const faixa = faixaFor(total);
+  const data = state === 'bad' ? AREAS_DATA.map(d => ({
+    ...d, pct: d.paused ? undefined : Math.max(0, (d.pct||0) - 50),
+  })) : AREAS_DATA;
+  const ativos = data.filter(d => !d.paused);
+  const total = Math.round(ativos.reduce((s,d) => s + (d.pct||0), 0) / ativos.length);
+  const f = faixaFor(total);
 
   return (
     <Screen tab="areas">
-      <BackBar action="Áreas"/>
-      <PageHeader kicker="visão geral" title="Alvo de Vida"/>
+      <BackBar/>
+      <SectionHeader title="Alvo de Vida"/>
 
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        marginTop: 8, marginBottom: 16, position: 'relative',
-      }}>
-        <AlvoPizza data={data} size={320}/>
-        {/* total no centro */}
+      <div style={{ position: 'relative', display: 'flex',
+        justifyContent: 'center', margin: '8px 0 16px' }}>
+        <AlvoPizza data={data}/>
         <div style={{
           position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)', textAlign: 'center',
+          transform: 'translate(-50%,-50%)', textAlign: 'center',
         }}>
-          <div style={{
-            fontSize: 30, fontWeight: 800, color: faixa.color, lineHeight: 1,
-            fontVariantNumeric: 'tabular-nums',
-          }}>{total}<span style={{ fontSize: 14 }}>%</span></div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: faixa.color,
-            letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 4 }}>
-            {faixa.label}
+          <div style={{ fontFamily: T.fontDisplay, fontSize: 32, fontWeight: 700,
+            color: T.ink, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            {total}<span style={{ fontSize: 14, color: T.weak }}>%</span>
+          </div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: f.ink,
+            letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
+            {f.label}
           </div>
         </div>
       </div>
 
-      {/* Legenda */}
-      <div style={{
-        margin: '0 16px', background: T.card, borderRadius: 14,
-        border: `0.5px solid ${T.border}`, padding: '10px 4px',
-        display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 4,
-      }}>
+      <div style={{ padding: '0 16px', display: 'grid',
+        gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {data.map((d, i) => (
           <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 12px',
+            background: T.card, borderRadius: 16,
+            border: `1px solid ${T.border}`,
+            padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2,
-              background: d.area.color, flexShrink: 0 }}/>
-            <div style={{ flex: 1, fontSize: 12, color: T.text, minWidth: 0,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ width: 10, height: 10, borderRadius: 5,
+              background: d.area.ink, flexShrink: 0 }}/>
+            <div style={{ flex: 1, fontSize: 12, color: T.ink, fontWeight: 600,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {d.area.name}
             </div>
-            <div style={{
-              fontSize: 12, fontWeight: 700,
-              color: d.paused ? T.weak : faixaFor(d.pctDay).color,
-              fontVariantNumeric: 'tabular-nums',
-            }}>{d.paused ? '—' : `${d.pctDay}%`}</div>
+            <div style={{ fontSize: 12, fontWeight: 700,
+              color: d.paused ? T.weak : T.ink,
+              fontVariantNumeric: 'tabular-nums' }}>
+              {d.paused ? '—' : `${d.pct}%`}
+            </div>
           </div>
         ))}
       </div>
@@ -231,159 +201,122 @@ function ScreenAlvo({ state = 'good' }) {
 }
 
 // ─── Detalhe da Área ───
-function MiniSparkline({ data, color, height = 110 }) {
-  const max = 100;
-  const w = 326;
-  const step = w / (data.length - 1);
-  const pts = data.map((v, i) => `${i*step},${height - (v/max)*(height-10) - 5}`).join(' ');
-  return (
-    <svg width={w} height={height} style={{ display: 'block' }}>
-      {/* faixas de fundo */}
-      {[20, 40, 60, 80, 100].map((th, i) => {
-        const colors = ['#6B4F2A', '#B5391C', '#C7A52E', '#2E8B57', '#1F6FB2'];
-        const prev = i === 0 ? 0 : [20,40,60,80][i-1];
-        return <rect key={i} x="0" y={height - (th/max)*(height-10) - 5}
-          width={w} height={(th-prev)/max*(height-10)}
-          fill={colors[i]} opacity="0.06"/>;
-      })}
-      {/* eixos discretos */}
-      <line x1="0" y1={height-5} x2={w} y2={height-5} stroke={T.border} strokeWidth="0.5"/>
-      {/* linha */}
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"/>
-      {/* últimos pontos */}
-      {data.map((v, i) => (
-        <circle key={i} cx={i*step} cy={height - (v/max)*(height-10) - 5}
-          r={i === data.length-1 ? 3 : 1.5} fill={color}/>
-      ))}
-    </svg>
-  );
-}
-
 function ScreenAreaDetail({ state = 'good' }) {
   const isGood = state === 'good';
   const area = isGood ? AREAS.fisica : AREAS.espiritual;
-  const pct = isGood ? 92 : 0;
-  const seven = isGood
-    ? [70, 78, 65, 80, 75, 82, 92]
-    : [25, 18, 12, 10, 5, 0, 0];
-
-  // 4 semanas
-  const monthData = isGood
-    ? [55, 60, 65, 60, 70, 72, 68, 78, 82, 75, 80, 78, 85, 92, 88, 75, 80, 92, 78, 85, 82, 78, 92, 88, 90, 78, 80, 92]
-    : [40, 35, 28, 30, 22, 18, 15, 20, 18, 25, 12, 8, 5, 12, 18, 8, 5, 0, 10, 15, 8, 0, 5, 12, 0, 0, 0, 0];
-
-  const tasks = isGood ? [
-    { time: '06:30', title: 'Treino · força',         status: 'done',  weight: 3 },
-    { time: '12:00', title: 'Caminhada 20min',        status: 'done',  weight: 1 },
-    { time: '21:30', title: 'Alongamento',            status: 'open',  weight: 1 },
-    { time: null,    title: 'Pesar-se (semanal)',     status: 'done',  weight: 1 },
+  const pct = isGood ? 88 : 12;
+  const week = isGood ? [70,75,68,82,78,90,88] : [25,18,12,10,5,0,0];
+  const habits = isGood ? [
+    { title: 'Treino · força',     type: 'bars', value: '5', unit: 'sessões', data: [3,4,2,5,4,5,5] },
+    { title: 'Caminhar 20min',     type: 'wave', value: '7',  unit: 'dias',    data: [1,1,1,1,1,1,1] },
+    { title: 'Alongamento',        type: 'semi', pct: 60,    value: '4', unit: 'de 7' },
+    { title: 'Pesar-se (sem)',     type: 'bars', value: '1',  unit: 'sem',     data: [1,1,1,1,1,1,1] },
   ] : [
-    { time: '06:00', title: 'Oração matinal',         status: 'fail',  weight: 3 },
-    { time: '07:00', title: 'Leitura bíblica',        status: 'fail',  weight: 2 },
-    { time: '21:00', title: 'Devocional',             status: 'open',  weight: 2, late: true },
+    { title: 'Oração matinal',     type: 'bars', value: '0', unit: 'dias',    data: [3,2,1,1,0,0,0] },
+    { title: 'Leitura bíblica',    type: 'wave', value: '0',  unit: 'min',     data: [10,8,5,3,2,0,0] },
+    { title: 'Devocional',         type: 'semi', pct: 0,     value: '0', unit: 'de 7' },
   ];
 
   return (
     <Screen tab="areas">
-      <BackBar action="Áreas"/>
+      <BackBar/>
 
-      {/* Header com cor-base como faixa */}
-      <div style={{ padding: '0 24px' }}>
+      {/* Header com cor da área */}
+      <div style={{ padding: '4px 24px 0' }}>
         <div style={{
-          width: 6, height: 28, background: area.color,
-          borderRadius: 3, marginBottom: 10,
-        }}/>
-        <div style={{ fontSize: 11, fontWeight: 600, color: T.weak,
-          letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          display: 'inline-block',
+          background: area.soft, color: area.ink,
+          fontSize: 11, fontWeight: 700, letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          padding: '5px 10px', borderRadius: 12,
+        }}>
           área {area.opt ? 'opcional' : 'obrigatória'}
         </div>
         <div style={{
-          fontSize: 28, fontWeight: 800, color: T.text,
-          letterSpacing: -0.4, marginTop: 4, lineHeight: 1.05,
+          fontFamily: T.fontDisplay, fontSize: 32, fontWeight: 700,
+          color: T.ink, letterSpacing: -0.6, marginTop: 12, lineHeight: 1.05,
         }}>{area.name}</div>
       </div>
 
-      {/* Anel da área */}
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '20px 0 14px' }}>
-        <BigRing pct={pct} size={196}/>
+      {/* Anel central */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
+        <BigRing pct={pct} size={196} stroke={20} color={area.ink}/>
       </div>
 
-      {/* 7d % + média */}
-      <div style={{ display: 'flex', gap: 10, padding: '0 20px', marginBottom: 22 }}>
-        <StatCard label="7d %" value={`${seven[seven.length-1]}%`} sub="hoje"/>
-        <StatCard label="Média 4sem" value={`${Math.round(monthData.reduce((a,b)=>a+b,0)/monthData.length)}%`}/>
-        <StatCard label="Tendência" value={isGood ? '+12%' : '−18%'} sub="vs anterior"/>
+      {/* Resumo semana mini */}
+      <div style={{ padding: '0 16px 20px' }}>
+        <div style={{
+          background: T.card, borderRadius: 22,
+          border: `1px solid ${T.border}`, padding: '14px 18px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.weak,
+              textTransform: 'uppercase', letterSpacing: 1 }}>
+              Esta semana
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: area.ink,
+              fontVariantNumeric: 'tabular-nums' }}>
+              {isGood ? '+12%' : '−18%'}
+            </div>
+          </div>
+          <MiniBars data={week} color={area.ink} width={326} height={70}/>
+          <div style={{ display: 'flex', justifyContent: 'space-between',
+            marginTop: 8, fontSize: 10, color: T.weak, fontWeight: 600 }}>
+            {['M','T','Q','Q','S','S','D'].map((d,i) => <span key={i}>{d}</span>)}
+          </div>
+        </div>
       </div>
 
-      {/* Gráfico 4 semanas */}
-      <div style={{ padding: '0 20px', marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: T.weak,
-          letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
-          Últimas 4 semanas
-        </div>
+      {/* Hábitos da área (grid 2 cols) */}
+      <div style={{ padding: '0 24px 8px',
+        fontSize: 11, fontWeight: 700, color: T.weak,
+        textTransform: 'uppercase', letterSpacing: 1 }}>
+        Hábitos
       </div>
-      <div style={{ margin: '0 16px 22px', background: T.card,
-        borderRadius: 14, border: `0.5px solid ${T.border}`, padding: 16 }}>
-        <MiniSparkline data={monthData} color={area.color}/>
-        <div style={{ display: 'flex', justifyContent: 'space-between',
-          marginTop: 6, fontSize: 10, color: T.weak,
-          fontVariantNumeric: 'tabular-nums' }}>
-          <span>4sem atrás</span><span>3sem</span><span>2sem</span><span>1sem</span><span>hoje</span>
-        </div>
-      </div>
-
-      {/* Tarefas */}
-      <div style={{ padding: '0 20px', marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: T.weak,
-          letterSpacing: 1.2, textTransform: 'uppercase' }}>
-          Tarefas
-        </div>
-      </div>
-      <div style={{ margin: '0 16px 22px', background: T.card,
-        borderRadius: 16, border: `0.5px solid ${T.border}`, overflow: 'hidden' }}>
-        {tasks.map((t, i) => (
-          <TaskRow key={i} {...t} area={area.color} isLast={i === tasks.length-1}/>
+      <div style={{ padding: '0 16px',
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {habits.map((h, i) => (
+          <HabitCard key={i} habit={h} area={area}/>
         ))}
       </div>
 
-      {/* Meta relacionada */}
-      <div style={{ padding: '0 20px', marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: T.weak,
-          letterSpacing: 1.2, textTransform: 'uppercase' }}>
-          Meta
-        </div>
+      {/* Meta */}
+      <div style={{ padding: '20px 24px 8px',
+        fontSize: 11, fontWeight: 700, color: T.weak,
+        textTransform: 'uppercase', letterSpacing: 1 }}>
+        Meta do ano
       </div>
-      <div style={{ margin: '0 16px 22px', background: T.card,
-        borderRadius: 14, border: `0.5px solid ${T.border}`, padding: '16px 18px' }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: T.text }}>
-          {isGood ? 'Treinar 150x este ano' : 'Ler a Bíblia em 1 ano'}
-        </div>
-        <div style={{ fontSize: 12, color: T.weak, marginTop: 4 }}>
-          {isGood ? '87 / 150' : '38 / 365'} · prazo {isGood ? '31 dez' : '31 dez'}
-        </div>
-        {/* barra */}
-        <div style={{ height: 6, background: T.input, borderRadius: 3,
-          marginTop: 12, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            width: isGood ? '58%' : '10%',
-            background: isGood ? T.success : T.danger,
-          }}/>
-        </div>
+      <div style={{ padding: '0 16px' }}>
         <div style={{
-          marginTop: 10, fontSize: 13, color: isGood ? T.success : T.danger,
-          fontWeight: 600,
+          background: T.card, borderRadius: 22,
+          border: `1px solid ${T.border}`, padding: '16px 18px',
         }}>
-          {isGood
-            ? 'No ritmo atual: termina 12 dias antes.'
-            : 'No ritmo atual: termina 142 dias atrasado.'}
+          <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 700, color: T.ink }}>
+            {isGood ? 'Treinar 150x este ano' : 'Ler a Bíblia em 1 ano'}
+          </div>
+          <div style={{ fontSize: 12, color: T.weak, marginTop: 4 }}>
+            {isGood ? '87 / 150' : '38 / 365'}
+          </div>
+          <div style={{ height: 8, background: 'rgba(0,0,0,0.06)', borderRadius: 4,
+            marginTop: 12, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: isGood ? '58%' : '10%',
+              background: area.ink, borderRadius: 4,
+            }}/>
+          </div>
+          <div style={{
+            marginTop: 10, fontSize: 12, color: isGood ? area.ink : '#B5524A',
+            fontWeight: 600,
+          }}>
+            {isGood
+              ? 'No ritmo: termina 12 dias antes.'
+              : 'No ritmo: termina 142 dias atrasado.'}
+          </div>
         </div>
       </div>
-
-      {/* Botão pausar (só opcionais) — área é obrigatória aqui, então omito */}
     </Screen>
   );
 }
 
-Object.assign(window, { ScreenAreas, ScreenAlvo, ScreenAreaDetail });
+Object.assign(window, { ScreenAreas, ScreenAlvo, ScreenAreaDetail, AREAS_DATA });

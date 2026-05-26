@@ -26,7 +26,7 @@ export function Seletor<T extends string | number>({ label, valor, opcoes, onCha
                 ativo && { backgroundColor: tema.acento, borderColor: tema.acento },
               ]}
             >
-              <Text style={[styles.chipTxt, ativo && { color: tema.texto, fontWeight: '600' }]}>
+              <Text style={[styles.chipTxt, ativo && { color: tema.acentoTexto, fontWeight: '600' }]}>
                 {o.rotulo}
               </Text>
             </Pressable>

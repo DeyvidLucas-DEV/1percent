@@ -9,6 +9,7 @@ import { ConfigRow } from '../../src/components/ui/ConfigRow';
 import { useAppStore } from '../../src/store/appStore';
 import { limparSessao } from '../../src/auth/sessao';
 import { api } from '../../src/lib/api';
+import { resetDb } from '../../src/db/schema';
 import { getUser } from '../../src/db/queries/users';
 import { listarAreas } from '../../src/db/queries/areas';
 import { listarTarefasAtivas } from '../../src/db/queries/tarefas';
@@ -40,6 +41,7 @@ function iniciais(nome?: string | null): string {
 export default function Config() {
   const router = useRouter();
   const setLogado = useAppStore(s => s.setLogado);
+  const setOnboarded = useAppStore(s => s.setOnboarded);
   const [user, setUser] = useState<User | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -89,7 +91,7 @@ export default function Config() {
   function apagarConta() {
     Alert.alert(
       'Apagar conta',
-      'Isso apaga TODOS os seus dados na nuvem. O dado local desse aparelho continua até você reinstalar o app. Sem volta.',
+      'Isso apaga TODOS os seus dados — na nuvem e neste aparelho. Sem volta.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -99,6 +101,11 @@ export default function Config() {
             try {
               await api.del('/me');
               await limparSessao();
+              // Apaga o SQLite local. Sem isso, re-logar com a mesma conta
+              // Google reabre direto na Home com os dados do user antigo
+              // (bootstrap lê users.onboarded_at local e marca onboarded=true).
+              await resetDb();
+              setOnboarded(false);
               setLogado(null);
               router.replace('/login');
             } catch (e: any) {
@@ -130,7 +137,7 @@ export default function Config() {
         </View>
 
         <ConfigGroup label="Conta">
-          <ConfigRow icon="create-outline" title="Editar cadastro" onPress={() => Alert.alert('Em breve', 'Edição de cadastro chegará num próximo passo.')} />
+          <ConfigRow icon="create-outline" title="Editar cadastro" onPress={() => router.push({ pathname: '/onboarding/cadastro', params: { modo: 'editar' } })} />
           <ConfigRow
             icon="briefcase-outline"
             title="Horário de trabalho"

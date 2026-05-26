@@ -62,6 +62,76 @@ export async function salvarHorarioTrabalho(
   );
 }
 
+// Contexto de vida — preenchido no onboarding conversacional.
+export async function salvarContextoVida(dados: {
+  trabalha: boolean | null;
+  tipoTrabalho: string | null;
+  praticaFe: boolean | null;
+  feDenominacao: string | null;
+  frequentaComunidade: boolean | null;
+  estuda: boolean | null;
+  fazTerapia: boolean | null;
+}): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE users SET
+       trabalha = ?,
+       tipo_trabalho = ?,
+       pratica_fe = ?,
+       fe_denominacao = ?,
+       frequenta_comunidade = ?,
+       estuda = ?,
+       faz_terapia = ?
+     WHERE id = 1`,
+    [
+      dados.trabalha === null ? null : dados.trabalha ? 1 : 0,
+      dados.tipoTrabalho,
+      dados.praticaFe === null ? null : dados.praticaFe ? 1 : 0,
+      dados.feDenominacao,
+      dados.frequentaComunidade === null ? null : dados.frequentaComunidade ? 1 : 0,
+      dados.estuda === null ? null : dados.estuda ? 1 : 0,
+      dados.fazTerapia === null ? null : dados.fazTerapia ? 1 : 0,
+    ]
+  );
+}
+
+// Marca conexão com Apple Calendar e qual calendário usar como default.
+// Quando desconectar (futuro), passar null nos três.
+export async function marcarAppleCalendarConectado(
+  calendarId: string,
+  calendarTitulo: string
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE users SET
+       apple_calendar_conectado_em = ?,
+       apple_calendar_id = ?,
+       apple_calendar_titulo = ?
+     WHERE id = 1`,
+    [agoraIso(), calendarId, calendarTitulo]
+  );
+}
+
+export async function desmarcarAppleCalendar(): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE users SET
+       apple_calendar_conectado_em = NULL,
+       apple_calendar_id = NULL,
+       apple_calendar_titulo = NULL
+     WHERE id = 1`
+  );
+}
+
+// Marca conexão com Google Calendar (Fase 2 — só flag por enquanto).
+export async function marcarGoogleCalendarConectado(): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE users SET google_calendar_conectado_em = ? WHERE id = 1`,
+    [agoraIso()]
+  );
+}
+
 export async function salvarAutoavaliacao(
   notas: { area_id: number; nota: number }[]
 ): Promise<void> {

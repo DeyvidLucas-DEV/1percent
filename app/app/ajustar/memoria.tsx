@@ -293,6 +293,6 @@ const styles = StyleSheet.create({
   btnSec: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   btnAceitar: { backgroundColor: tema.acento },
   btnRecusar: { borderWidth: 1, borderColor: tema.bordaForte },
-  btnAceitarTxt: { color: '#F5F1E5', fontFamily: tema.fontFamily.textBold, fontSize: 14 },
+  btnAceitarTxt: { color: tema.acentoTexto, fontFamily: tema.fontFamily.textBold, fontSize: 14 },
   btnRecusarTxt: { color: tema.texto, fontFamily: tema.fontFamily.textSemi, fontSize: 14 },
 });

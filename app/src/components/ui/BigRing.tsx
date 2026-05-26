@@ -1,45 +1,81 @@
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  useAnimatedReaction,
+  runOnJS,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { tema } from '../../lib/tema';
+import { light } from '../../lib/paleta';
 import { corPorPercentual, rotuloPorPercentual } from '../../domain/cores';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type Props = {
   pct: number;
   size?: number;
   stroke?: number;
   sublabel?: boolean;
+  color?: string;
 };
 
-export function BigRing({ pct, size = 232, stroke = 18, sublabel = true }: Props) {
+const DUR = 700;
+
+export function BigRing({ pct, size = 220, stroke = 22, sublabel = true, color }: Props) {
   const r = (size - stroke) / 2;
   const cx = size / 2;
   const c = 2 * Math.PI * r;
-  const offset = c * (1 - Math.min(pct, 100) / 100);
-  const cor = corPorPercentual(pct);
+  const strokeColor = color ?? corPorPercentual(pct);
   const rotulo = rotuloPorPercentual(pct);
+
+  const progress = useSharedValue(pct);
+  const [display, setDisplay] = useState(pct);
+
+  useEffect(() => {
+    progress.value = withTiming(pct, {
+      duration: DUR,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [pct, progress]);
+
+  useAnimatedReaction(
+    () => Math.round(progress.value),
+    (cur, prev) => {
+      if (prev === null || cur !== prev) runOnJS(setDisplay)(cur);
+    }
+  );
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: c * (1 - Math.min(progress.value, 100) / 100),
+  }));
 
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle cx={cx} cy={cx} r={r} fill="none" stroke="#23262E" strokeWidth={stroke} />
-        <Circle
+        <Circle cx={cx} cy={cx} r={r} fill="none" stroke={light.borda6} strokeWidth={stroke} />
+        <AnimatedCircle
           cx={cx}
           cy={cx}
           r={r}
           fill="none"
-          stroke={cor}
+          stroke={strokeColor}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
-          strokeDashoffset={offset}
+          animatedProps={animatedProps}
         />
       </Svg>
       <View style={[StyleSheet.absoluteFill, styles.center]}>
         <View style={styles.row}>
-          <Text style={[styles.numero, { color: cor, fontSize: size * 0.31 }]}>{pct}</Text>
-          <Text style={[styles.percent, { color: cor, fontSize: size * 0.14 }]}>%</Text>
+          <Text style={[styles.numero, { fontSize: size * 0.32 }]}>{display}</Text>
+          <Text style={[styles.percent, { fontSize: size * 0.13 }]}>%</Text>
         </View>
         {sublabel && (
-          <Text style={[styles.label, { color: cor, fontSize: size * 0.065 }]}>
+          <Text style={[styles.label, { fontSize: size * 0.06 }]}>
             {rotulo.toUpperCase()}
           </Text>
         )}
@@ -51,7 +87,21 @@ export function BigRing({ pct, size = 232, stroke = 18, sublabel = true }: Props
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-end' },
-  numero: { fontWeight: '800', letterSpacing: -2, lineHeight: undefined },
-  percent: { fontWeight: '700', marginLeft: 2, marginBottom: 4 },
-  label: { marginTop: 8, fontWeight: '600', letterSpacing: 1.5 },
+  numero: {
+    color: tema.ink,
+    fontFamily: tema.fontFamily.display,
+    letterSpacing: -2,
+  },
+  percent: {
+    color: tema.weak,
+    fontFamily: tema.fontFamily.display,
+    marginLeft: 2,
+    marginBottom: 6,
+  },
+  label: {
+    color: tema.weak,
+    fontFamily: tema.fontFamily.textBold,
+    marginTop: 8,
+    letterSpacing: 1,
+  },
 });

@@ -19,10 +19,11 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    provider: text('provider', { enum: ['apple', 'google'] }).notNull(),
+    provider: text('provider', { enum: ['apple', 'google', 'email'] }).notNull(),
     providerSub: text('provider_sub').notNull(),
     email: text('email'),
     nome: text('nome'),
+    passwordHash: text('password_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -216,6 +217,49 @@ export const userMemoryEpisodes = pgTable(
     pk: primaryKey({ columns: [t.userId, t.id] }),
     idxUserTime: index('idx_episodes_user_time').on(t.userId, t.occurredAt.desc()),
   })
+);
+
+// Leitura emocional do dia. Uma linha por usuário por dia (UNIQUE user_id+data),
+// last-write-wins: o último daily-note sobrescreve a leitura anterior daquele dia.
+// data é YYYY-MM-DD na TZ LOCAL do usuário (enviada pelo app) — servidor não
+// calcula o dia a partir de timestamp UTC pra não desalinhar relato perto da
+// meia-noite. Alimenta o gráfico de tendência em Insights.
+export const userDailyReadings = pgTable(
+  'user_daily_readings',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    id: uuid('id').notNull(),
+    data: text('data').notNull(),
+    humorScore: real('humor_score').notNull(),
+    humorRotulo: text('humor_rotulo').notNull(),
+    sinalAlerta: boolean('sinal_alerta').notNull().default(false),
+    sourceEventId: uuid('source_event_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.id] }),
+    uniqUserData: uniqueIndex('uniq_daily_readings_user_data').on(t.userId, t.data),
+    idxUserData: index('idx_daily_readings_user_data').on(t.userId, t.data),
+  })
+);
+
+// ─── CAMADA GLOBAL ────────────────────────────────────────────────────
+// Conhecimento compartilhado: livros, princípios, frameworks. SEM user_id —
+// é o ÚNICO escopo que pode ser buscado vetorialmente sem filtro de pessoa.
+// Helper de retrieval correspondente: retrieveSharedKnowledge em ai/retrieval.ts.
+// JAMAIS misturar com user_memory_episodes em uma mesma query.
+export const sharedKnowledge = pgTable(
+  'shared_knowledge',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    fonte: text('fonte').notNull(),           // ex: "Eclesiastes 11:6", "Atomic Habits — cap 3"
+    trecho: text('trecho').notNull(),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+    embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  }
 );
 
 // Não sincronizada — controle de custo/abuso só faz sentido server-side.

@@ -1,12 +1,10 @@
+// Faixas de performance. Hexes moram em src/lib/paleta.ts.
+import { faixas } from '../lib/paleta';
+
 export type FaixaCor = 'marrom' | 'vermelho' | 'amarelo' | 'verde' | 'azul';
 
-export const CORES: Record<FaixaCor, string> = {
-  marrom:   '#6B4F2A',
-  vermelho: '#B5391C',
-  amarelo:  '#C7A52E',
-  verde:    '#2E8B57',
-  azul:     '#1F6FB2',
-};
+export const CORES: Record<FaixaCor, string> = faixas.ink;
+export const CORES_SOFT: Record<FaixaCor, string> = faixas.soft;
 
 export const ROTULOS: Record<FaixaCor, string> = {
   marrom:   'Estagnação',
@@ -26,6 +24,10 @@ export function faixaPorPercentual(p: number): FaixaCor {
 
 export function corPorPercentual(p: number): string {
   return CORES[faixaPorPercentual(p)];
+}
+
+export function corSoftPorPercentual(p: number): string {
+  return CORES_SOFT[faixaPorPercentual(p)];
 }
 
 export function rotuloPorPercentual(p: number): string {

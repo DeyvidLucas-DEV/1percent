@@ -127,7 +127,7 @@ export default function HorarioTrabalho() {
             disabled={salvando}
           >
             {salvando ? (
-              <ActivityIndicator color="#F5F1E5" />
+              <ActivityIndicator color={tema.acentoTexto} />
             ) : (
               <Text style={styles.botaoSalvarTxt}>Salvar</Text>
             )}
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   botaoSalvarTxt: {
-    color: '#F5F1E5',
+    color: tema.acentoTexto,
     fontFamily: tema.fontFamily.textBold,
     fontSize: 16,
   },

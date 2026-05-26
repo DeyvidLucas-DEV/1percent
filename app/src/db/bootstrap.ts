@@ -13,22 +13,42 @@ export type BootstrapResult = {
 };
 
 export async function bootstrap(): Promise<BootstrapResult> {
-  await initSchema();
-  await seedIfEmpty();
-  const sessao = await lerSessao();
-  const user = await getUser();
-  const onboarded = !!user?.onboarded_at;
+  // Schema + seed SEMPRE rodam — nunca retorna early se falharem.
+  // As migrações em rodarMigracoes() são idempotentes: se o schema já existir
+  // parcialmente (de um boot anterior), as novas colunas são adicionadas.
+  try {
+    await initSchema();
+  } catch (e) {
+    console.error('[bootstrap] initSchema falhou, tentando continuar:', e);
+  }
+
+  try {
+    await seedIfEmpty();
+  } catch (e) {
+    console.error('[bootstrap] seedIfEmpty falhou:', e);
+  }
+
+  let sessao: { jwt: string; userUuid: string } | null = null;
+  try {
+    sessao = await lerSessao();
+  } catch {
+    // SecureStore falhou — trata como deslogado
+  }
+
+  let onboarded = false;
+  try {
+    const user = await getUser();
+    onboarded = !!(user?.onboarded_at && user?.nome && user.nome.trim());
+  } catch {
+    // DB query falhou — trata como não-onboarded
+  }
 
   if (sessao && onboarded) {
     try {
       const ok = await pedirPermissao();
       if (ok) await reagendarTudo();
-    } catch {
-      // Em ambiente Expo Go com SDK 53+ as notificações remotas são limitadas,
-      // mas locais agendadas funcionam. Seguimos sem travar o boot se falhar.
-    }
-    // Sync best-effort em background — não trava o boot se rede/backend falhar.
-    sincronizar().catch(err => {
+    } catch {}
+    sincronizar().catch((err) => {
       console.warn('[sync] falhou no boot:', err);
     });
   }

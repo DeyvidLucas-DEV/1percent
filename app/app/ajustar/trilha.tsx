@@ -13,6 +13,7 @@ import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { tema } from '../../src/lib/tema';
+import { acentos } from '../../src/lib/paleta';
 import { PageHeader } from '../../src/components/ui/PageHeader';
 import { api, ApiError } from '../../src/lib/api';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
@@ -317,8 +318,8 @@ function CardPlano({ b }: { b: BlocoPlano }) {
   return (
     <View style={[styles.card, styles.cardDestaque]}>
       <View style={styles.cardTopo}>
-        <View style={[styles.iconeWrap, { backgroundColor: 'rgba(245,241,229,0.12)' }]}>
-          <Ionicons name="calendar-outline" size={18} color="#F5F1E5" />
+        <View style={[styles.iconeWrap, { backgroundColor: acentos.glowSobreInk }]}>
+          <Ionicons name="calendar-outline" size={18} color={tema.acentoTexto} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.cardTitulo, styles.cardTituloDestaque]}>Plano semanal</Text>
@@ -328,10 +329,10 @@ function CardPlano({ b }: { b: BlocoPlano }) {
       <Text style={[styles.relato, styles.relatoDestaque]}>{b.intencao}</Text>
       <View style={styles.pillsLinha}>
         {b.intensidade ? (
-          <Pill icone="pulse-outline" cor="#F5F1E5" texto={b.intensidade} destaque />
+          <Pill icone="pulse-outline" cor={tema.acentoTexto} texto={b.intensidade} destaque />
         ) : null}
         {b.ajustes > 0 ? (
-          <Pill icone="construct-outline" cor="#F5F1E5" texto={`${b.ajustes} ajuste${b.ajustes > 1 ? 's' : ''}`} destaque />
+          <Pill icone="construct-outline" cor={tema.acentoTexto} texto={`${b.ajustes} ajuste${b.ajustes > 1 ? 's' : ''}`} destaque />
         ) : null}
       </View>
     </View>
@@ -373,11 +374,11 @@ function Pill({
     <View
       style={[
         styles.pill,
-        destaque && { backgroundColor: 'rgba(245,241,229,0.12)', borderColor: 'transparent' },
+        destaque && { backgroundColor: acentos.glowSobreInk, borderColor: 'transparent' },
       ]}
     >
       <Ionicons name={icone} size={12} color={cor} />
-      <Text style={[styles.pillTxt, destaque && { color: '#F5F1E5' }]}>{texto}</Text>
+      <Text style={[styles.pillTxt, destaque && { color: tema.acentoTexto }]}>{texto}</Text>
     </View>
   );
 }
@@ -545,14 +546,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: tema.fontFamily.textBold,
   },
-  cardTituloDestaque: { color: '#F5F1E5' },
+  cardTituloDestaque: { color: tema.acentoTexto },
   cardHora: {
     color: tema.textoFraco,
     fontSize: 11,
     fontFamily: tema.fontFamily.text,
     marginTop: 1,
   },
-  cardHoraDestaque: { color: 'rgba(245,241,229,0.7)' },
+  cardHoraDestaque: { color: acentos.textoSobreInkBaixo },
   episodioTitulo: {
     color: tema.texto,
     fontSize: 13,
@@ -564,7 +565,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  relatoDestaque: { color: 'rgba(245,241,229,0.92)' },
+  relatoDestaque: { color: acentos.textoSobreInkAlto },
   expandir: {
     color: tema.acento,
     fontSize: 12,

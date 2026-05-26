@@ -1,4 +1,5 @@
 import type { Tarefa, Execucao } from '../db/types';
+import { intensidade as INT_CORES } from '../lib/paleta';
 
 export type Intensidade = 'leve' | 'moderada' | 'intensa' | 'desorganizada';
 
@@ -9,12 +10,7 @@ export const INTENSIDADE_ROTULO: Record<Intensidade, string> = {
   desorganizada: 'Desorganizada',
 };
 
-export const INTENSIDADE_COR: Record<Intensidade, string> = {
-  leve: '#6EC1A2',
-  moderada: '#E1A93B',
-  intensa: '#C0392B',
-  desorganizada: '#8E44AD',
-};
+export const INTENSIDADE_COR: Record<Intensidade, string> = INT_CORES;
 
 function cargaSemanal(tarefas: Tarefa[]): number {
   return tarefas.reduce((s, t) => {

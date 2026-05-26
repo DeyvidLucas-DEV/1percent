@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, RefreshControl, Pressable } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, RefreshControl, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { format, addMonths, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { tema } from '../../src/lib/tema';
 import { BigRing } from '../../src/components/ui/BigRing';
 import { StatCard } from '../../src/components/ui/StatCard';
 import { TaskRow } from '../../src/components/ui/TaskRow';
-import { buscarAreaPorId } from '../../src/db/queries/areas';
+import { buscarAreaPorId, pausarArea, reativarArea } from '../../src/db/queries/areas';
+import { alertaPausa } from '../../src/domain/alertasPausa';
 import {
   listarExecucoesDoDia,
   type TarefaComExecucao,
@@ -46,6 +49,65 @@ export default function DetalheArea() {
 
   useFocusEffect(useCallback(() => { carregar(); }, [carregar]));
 
+  // Pausada: paused_until existe E ainda não venceu. listarAreas usa o mesmo
+  // critério, então a UI bate com o que o cálculo de dashboard considera.
+  const pausada =
+    !!area?.paused_until && area.paused_until > hojeIso();
+
+  function tentarPausar() {
+    if (!area) return;
+    Alert.alert(
+      `Pausar ${area.nome}?`,
+      alertaPausa(area.slug),
+      [
+        { text: 'Não, manter', style: 'cancel' },
+        {
+          text: 'Mesmo assim, pausar',
+          style: 'destructive',
+          onPress: () => confirmarPausa(),
+        },
+      ]
+    );
+  }
+
+  function confirmarPausa() {
+    if (!area) return;
+    Alert.alert(
+      'Confirmação final',
+      `Última chance. Pausar ${area.nome} por 6 meses significa que ela não vai contar no seu Alvo de Vida nesse período. Confirma?`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Pausar',
+          style: 'destructive',
+          onPress: async () => {
+            const ate = format(addMonths(new Date(), 6), 'yyyy-MM-dd');
+            await pausarArea(area.id, ate, 'Pausada no detalhe da área');
+            await carregar();
+          },
+        },
+      ]
+    );
+  }
+
+  function reativar() {
+    if (!area) return;
+    Alert.alert(
+      `Reativar ${area.nome}?`,
+      'A área volta a contar no seu Alvo de Vida e nas métricas do dia.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reativar',
+          onPress: async () => {
+            await reativarArea(area.id);
+            await carregar();
+          },
+        },
+      ]
+    );
+  }
+
   if (!area || !resumo) {
     return <SafeAreaView style={styles.bg} edges={['top']} />;
   }
@@ -68,6 +130,7 @@ export default function DetalheArea() {
             <View style={[styles.faixa, { backgroundColor: area.cor_base }]} />
             <Text style={styles.kicker}>
               ÁREA {area.obrigatoria ? 'OBRIGATÓRIA' : 'OPCIONAL'}
+              {pausada && area.paused_until ? ` · PAUSADA ATÉ ${format(parseISO(area.paused_until), "d 'de' MMM", { locale: ptBR })}` : ''}
             </Text>
             <Text style={styles.titulo}>{area.nome}</Text>
           </View>
@@ -117,6 +180,25 @@ export default function DetalheArea() {
             <Text style={styles.legenda}>
               Frequência por tarefa: {tarefas.map(t => freqTexto(t)).join(', ')}.
             </Text>
+          )}
+
+          {!area.obrigatoria && (
+            <View style={styles.acaoWrap}>
+              {pausada ? (
+                <Pressable style={styles.btnReativar} onPress={reativar}>
+                  <Text style={styles.btnReativarTxt}>Reativar área</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.btnPausar} onPress={tentarPausar}>
+                  <Text style={styles.btnPausarTxt}>Pausar área (6 meses)</Text>
+                </Pressable>
+              )}
+              <Text style={styles.acaoNota}>
+                {pausada
+                  ? 'Áreas pausadas voltam automaticamente após o prazo.'
+                  : 'Pausar exige duas confirmações. Você pode reativar a qualquer momento.'}
+              </Text>
+            </View>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -178,5 +260,40 @@ const styles = StyleSheet.create({
     color: tema.textoFraco,
     fontSize: 12,
     lineHeight: 18,
+  },
+  acaoWrap: {
+    marginHorizontal: 16,
+    marginTop: 22,
+  },
+  btnPausar: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: tema.bordaForte,
+  },
+  btnPausarTxt: {
+    color: tema.alerta,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  btnReativar: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 14,
+    backgroundColor: tema.acento,
+  },
+  btnReativarTxt: {
+    color: tema.acentoTexto,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  acaoNota: {
+    color: tema.textoFraco,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 10,
+    paddingHorizontal: 12,
   },
 });

@@ -3,9 +3,22 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 
-const audience = process.env.GOOGLE_CLIENT_ID;
-if (!audience) {
-  console.warn('[auth/google] GOOGLE_CLIENT_ID não definida — login Google vai falhar');
+// Aceita múltiplos client IDs (iOS + Android) via GOOGLE_CLIENT_IDS (CSV).
+// Fallback pra GOOGLE_CLIENT_ID legado pra não quebrar deploy antigo.
+const audience = (() => {
+  const csv = process.env.GOOGLE_CLIENT_IDS;
+  if (csv) {
+    const lista = csv.split(',').map((s) => s.trim()).filter(Boolean);
+    if (lista.length) return lista;
+  }
+  const legado = process.env.GOOGLE_CLIENT_ID;
+  return legado ? [legado] : [];
+})();
+
+if (audience.length === 0) {
+  console.warn(
+    '[auth/google] nenhum GOOGLE_CLIENT_IDS/GOOGLE_CLIENT_ID definido — login Google vai falhar'
+  );
 }
 
 export type GoogleClaims = {
@@ -27,7 +40,7 @@ function decodeUnsafePayload(token: string): Record<string, unknown> | null {
 }
 
 export async function validarTokenGoogle(idToken: string): Promise<GoogleClaims> {
-  if (!audience) throw new Error('GOOGLE_CLIENT_ID ausente no servidor');
+  if (audience.length === 0) throw new Error('GOOGLE_CLIENT_IDS ausente no servidor');
 
   // Debug: log claims antes da verificação
   const peek = decodeUnsafePayload(idToken);

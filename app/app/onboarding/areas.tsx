@@ -3,7 +3,7 @@ import { ScrollView, Text, View, StyleSheet, Pressable, Alert } from 'react-nati
 import { useRouter } from 'expo-router';
 import { tema } from '../../src/lib/tema';
 import { Botao } from '../../src/components/Botao';
-import { listarTodasAreas, pausarArea } from '../../src/db/queries/areas';
+import { listarTodasAreas, pausarArea, reativarArea } from '../../src/db/queries/areas';
 import { alertaPausa } from '../../src/domain/alertasPausa';
 import { format, addMonths } from 'date-fns';
 import type { Area } from '../../src/db/types';
@@ -58,6 +58,23 @@ export default function Areas() {
     );
   }
 
+  function reativar(area: Area) {
+    Alert.alert(
+      `Reativar ${area.nome}?`,
+      'A área volta a contar no seu Alvo de Vida e nas métricas do dia.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reativar',
+          onPress: async () => {
+            await reativarArea(area.id);
+            await carregar();
+          },
+        },
+      ]
+    );
+  }
+
   function avancar() {
     router.push('/onboarding/autoavaliacao');
   }
@@ -81,10 +98,16 @@ export default function Areas() {
                 {a.obrigatoria ? 'Obrigatória' : pausada ? 'Pausada' : 'Opcional'}
               </Text>
             </View>
-            {!a.obrigatoria && !pausada && (
-              <Pressable onPress={() => tentarPausar(a)}>
-                <Text style={styles.acao}>Pausar</Text>
-              </Pressable>
+            {!a.obrigatoria && (
+              pausada ? (
+                <Pressable onPress={() => reativar(a)}>
+                  <Text style={[styles.acao, { color: tema.sucesso }]}>Reativar</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => tentarPausar(a)}>
+                  <Text style={styles.acao}>Pausar</Text>
+                </Pressable>
+              )
             )}
           </View>
         );

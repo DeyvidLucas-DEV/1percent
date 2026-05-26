@@ -19,18 +19,16 @@ const styles = StyleSheet.create({
   grupo: { marginBottom: 22 },
   label: {
     fontSize: 11,
-    fontWeight: '700',
-    color: tema.textoFraco,
+    fontFamily: tema.fontFamily.textBold,
+    color: tema.weak,
     letterSpacing: 1.2,
     paddingHorizontal: 28,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   card: {
     marginHorizontal: 16,
-    backgroundColor: tema.bgCard,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: tema.borda,
+    backgroundColor: tema.card,
+    borderRadius: 22,
     overflow: 'hidden',
   },
 });

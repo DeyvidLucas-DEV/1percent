@@ -23,3 +23,13 @@ yarn-error.*
 # Google OAuth iOS plist (não é segredo, mas não precisa ir pro repo — Expo usa app.json)
 client_*.apps.googleusercontent.com.plist
 GoogleService-Info.plist
+
+# Segredos OAuth / Firebase Admin SDK
+client_secret_*.json
+*-firebase-adminsdk-*.json
+
+# Uploads temporarios
+uploads/
+
+# Arquivos avulsos
+*.mp3

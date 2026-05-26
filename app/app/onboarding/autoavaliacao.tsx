@@ -59,7 +59,7 @@ export default function Autoavaliacao() {
                   onPress={() => setNotas({ ...notas, [a.id]: n })}
                   style={[styles.bola, ativo && { backgroundColor: a.cor_base, borderColor: a.cor_base }]}
                 >
-                  <Text style={[styles.bolaTxt, ativo && { color: '#fff', fontWeight: '700' }]}>{n}</Text>
+                  <Text style={[styles.bolaTxt, ativo && { color: tema.acentoTexto, fontWeight: '700' }]}>{n}</Text>
                 </Pressable>
               );
             })}

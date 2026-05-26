@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { userMemoryFacts, userTrailEvents } from '../db/schema.ts';
+import { userDailyReadings, userMemoryFacts, userTrailEvents } from '../db/schema.ts';
 import { exigirAuth } from '../auth/middleware.ts';
 
 export const memoryRoutes = new Hono();
@@ -61,6 +61,41 @@ memoryRoutes.patch('/facts/:id', async (c) => {
   }).onConflictDoNothing({ target: [userTrailEvents.userId, userTrailEvents.id] });
 
   return c.json({ ok: true });
+});
+
+// Leituras emocionais do usuário no período. Alimenta o gráfico de tendência
+// em Insights. range=week → últimos 7 dias; range=month → últimos 30 dias.
+// Filtro mandatório por userId do JWT — JAMAIS aceita user_id do client.
+// Retorno ordenado por data asc pra renderização direta no chart.
+memoryRoutes.get('/mood', async (c) => {
+  const userId = c.get('userId');
+  const range = c.req.query('range') === 'month' ? 'month' : 'week';
+  const dias = range === 'month' ? 30 : 7;
+
+  // Janela calculada em UTC e formatada como YYYY-MM-DD. Como a coluna `data`
+  // já é local do usuário, filtramos lexicograficamente — ordem ISO bate com
+  // ordem cronológica. Margem de 1 dia evita cortar relatos perto da fronteira.
+  const limite = new Date();
+  limite.setDate(limite.getDate() - dias);
+  const dataMinima = limite.toISOString().slice(0, 10);
+
+  const linhas = await db
+    .select({
+      data: userDailyReadings.data,
+      humorScore: userDailyReadings.humorScore,
+      humorRotulo: userDailyReadings.humorRotulo,
+      sinalAlerta: userDailyReadings.sinalAlerta,
+    })
+    .from(userDailyReadings)
+    .where(
+      and(
+        eq(userDailyReadings.userId, userId),
+        gte(userDailyReadings.data, dataMinima)
+      )
+    )
+    .orderBy(asc(userDailyReadings.data));
+
+  return c.json({ range, readings: linhas });
 });
 
 // Soft delete: marca active=false. Mantém histórico, evita perder fonte (origemEventId).

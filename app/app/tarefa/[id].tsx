@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TextInput, Pressable, Alert } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TextInput, Pressable, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { tema } from '../../src/lib/tema';
 import { Botao } from '../../src/components/Botao';
 import {
@@ -15,6 +16,22 @@ import { buscarAreaPorId } from '../../src/db/queries/areas';
 import { reagendarTudo } from '../../src/lib/agendarNotificacoesTarefas';
 import type { Frequencia, Tarefa, Area } from '../../src/db/types';
 
+function horaParaDate(hhmm: string): Date {
+  const base = new Date();
+  base.setSeconds(0, 0);
+  if (/^\d{2}:\d{2}$/.test(hhmm)) {
+    base.setHours(Number(hhmm.slice(0, 2)));
+    base.setMinutes(Number(hhmm.slice(3, 5)));
+  } else {
+    base.setHours(7, 0);
+  }
+  return base;
+}
+
+function dateParaHora(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 const PESO_OPCOES: { valor: 1 | 2 | 3; label: string }[] = [
   { valor: 1, label: '1 — leve' },
   { valor: 2, label: '2 — médio' },
@@ -26,11 +43,6 @@ const FREQ_OPCOES: { valor: Frequencia; label: string }[] = [
   { valor: 'semanal', label: 'Semanal' },
   { valor: 'mensal', label: 'Mensal' },
 ];
-
-function validarHorario(s: string): boolean {
-  if (!s) return true;
-  return /^\d{2}:\d{2}$/.test(s) && Number(s.slice(0, 2)) < 24 && Number(s.slice(3, 5)) < 60;
-}
 
 export default function EditorTarefa() {
   const router = useRouter();
@@ -47,6 +59,8 @@ export default function EditorTarefa() {
   const [alvoCount, setAlvoCount] = useState('1');
   const [horario, setHorario] = useState('');
   const [salvando, setSalvando] = useState(false);
+  // iOS: picker fica inline aberto/fechado. Android: aberto via API imperativa.
+  const [pickerAberto, setPickerAberto] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -67,13 +81,36 @@ export default function EditorTarefa() {
     })();
   }, [ehNovo, tarefaId, areaIdInicial]);
 
+  function onPickerChange(_evento: DateTimePickerEvent, dataEscolhida?: Date) {
+    // Android: o evento fecha o dialog automaticamente. type 'set' = ok,
+    // 'dismissed' = cancelou.
+    if (Platform.OS === 'android') {
+      if (_evento.type === 'set' && dataEscolhida) {
+        setHorario(dateParaHora(dataEscolhida));
+      }
+      return;
+    }
+    // iOS: o picker é inline e dispara onChange a cada rolagem. Atualizamos
+    // o estado a cada mudança — o fechamento é manual via "Pronto".
+    if (dataEscolhida) setHorario(dateParaHora(dataEscolhida));
+  }
+
+  function abrirPickerHorario() {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: horaParaDate(horario),
+        mode: 'time',
+        is24Hour: true,
+        onChange: onPickerChange,
+      });
+      return;
+    }
+    setPickerAberto((aberto) => !aberto);
+  }
+
   async function salvar() {
     if (!nome.trim()) {
       Alert.alert('Falta o nome', 'Toda tarefa precisa de nome.');
-      return;
-    }
-    if (!validarHorario(horario)) {
-      Alert.alert('Horário inválido', 'Use o formato HH:MM (ex: 06:30) ou deixe vazio.');
       return;
     }
     const alvo = Number(alvoCount) || 1;
@@ -195,15 +232,48 @@ export default function EditorTarefa() {
           )}
 
           <Text style={styles.label}>HORÁRIO (OPCIONAL)</Text>
-          <TextInput
-            value={horario}
-            onChangeText={setHorario}
-            placeholder="HH:MM (ex: 06:30) — deixe vazio se não tiver hora fixa"
-            placeholderTextColor={tema.textoFraco}
-            style={styles.input}
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
-          />
+          <View style={styles.horarioRow}>
+            <Pressable
+              onPress={abrirPickerHorario}
+              style={[styles.horarioBotao, !horario && styles.horarioBotaoVazio]}
+            >
+              <Text style={[styles.horarioTxt, !horario && styles.horarioTxtVazio]}>
+                {horario || 'Sem horário'}
+              </Text>
+            </Pressable>
+            {!!horario && (
+              <Pressable
+                onPress={() => {
+                  setHorario('');
+                  setPickerAberto(false);
+                }}
+                style={styles.horarioLimpar}
+                hitSlop={8}
+              >
+                <Text style={styles.horarioLimparTxt}>Limpar</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {Platform.OS === 'ios' && pickerAberto && (
+            <View style={styles.pickerWrap}>
+              <View style={styles.pickerCabecalho}>
+                <Pressable onPress={() => setPickerAberto(false)} hitSlop={8}>
+                  <Text style={styles.pickerPronto}>Pronto</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={horaParaDate(horario)}
+                mode="time"
+                display="spinner"
+                is24Hour
+                locale="pt-BR"
+                onChange={onPickerChange}
+                themeVariant="light"
+              />
+            </View>
+          )}
+
           <Text style={styles.dica}>
             Se preencher, a tarefa aparece no horário no Hoje e fica marcada como atrasada se passar.
           </Text>
@@ -266,8 +336,59 @@ const styles = StyleSheet.create({
   },
   segBtnAtivo: { backgroundColor: tema.acento, borderColor: tema.acento },
   segTxt: { color: tema.textoFraco, fontSize: 13, fontWeight: '600' },
-  segTxtAtivo: { color: '#fff' },
+  segTxtAtivo: { color: tema.acentoTexto },
   dica: { color: tema.textoFraco, fontSize: 12, marginTop: 6, lineHeight: 18 },
+  horarioRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  horarioBotao: {
+    flex: 1,
+    backgroundColor: tema.bgInput,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+  },
+  horarioBotaoVazio: {
+    borderStyle: 'dashed',
+    borderColor: tema.bordaForte,
+  },
+  horarioTxt: {
+    color: tema.texto,
+    fontSize: 18,
+    fontFamily: tema.fontFamily.textSemi,
+    letterSpacing: 0.5,
+  },
+  horarioTxtVazio: {
+    color: tema.textoFraco,
+    fontSize: 15,
+    fontFamily: tema.fontFamily.text,
+    letterSpacing: 0,
+  },
+  horarioLimpar: { paddingHorizontal: 6, paddingVertical: 10 },
+  horarioLimparTxt: {
+    color: tema.perigo,
+    fontSize: 13,
+    fontFamily: tema.fontFamily.textSemi,
+  },
+  pickerWrap: {
+    marginTop: 10,
+    backgroundColor: tema.bgCard,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tema.borda,
+    overflow: 'hidden',
+  },
+  pickerCabecalho: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  pickerPronto: {
+    color: tema.texto,
+    fontSize: 15,
+    fontFamily: tema.fontFamily.textBold,
+  },
   botaoSec: {
     paddingVertical: 14,
     alignItems: 'center',

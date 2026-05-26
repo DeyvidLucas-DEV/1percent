@@ -2,6 +2,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { corPorPercentual } from '../../domain/cores';
 import { tema } from '../../lib/tema';
+import { base } from '../../lib/paleta';
 
 type Props = { pct: number; size?: number; stroke?: number };
 
@@ -15,7 +16,7 @@ export function MiniRing({ pct, size = 56, stroke = 5 }: Props) {
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle cx={cx} cy={cx} r={r} fill="none" stroke="#23262E" strokeWidth={stroke} />
+        <Circle cx={cx} cy={cx} r={r} fill="none" stroke={base.cinzaEscuro} strokeWidth={stroke} />
         <Circle
           cx={cx}
           cy={cx}

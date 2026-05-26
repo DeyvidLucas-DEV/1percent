@@ -48,6 +48,17 @@ export type User = {
   onboarded_at: string | null;
   horario_trabalho_inicio: string | null;
   horario_trabalho_fim: string | null;
+  trabalha: number | null;
+  tipo_trabalho: string | null;
+  pratica_fe: number | null;
+  fe_denominacao: string | null;
+  frequenta_comunidade: number | null;
+  estuda: number | null;
+  faz_terapia: number | null;
+  apple_calendar_conectado_em: string | null;
+  apple_calendar_id: string | null;
+  apple_calendar_titulo: string | null;
+  google_calendar_conectado_em: string | null;
 };
 
 export type Reflexao = {

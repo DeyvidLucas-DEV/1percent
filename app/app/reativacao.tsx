@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { tema } from '../src/lib/tema';
+import { base, acentos } from '../src/lib/paleta';
 import { Botao } from '../src/components/Botao';
 import { listarTarefasAtivas, marcarExecucao } from '../src/db/queries/tarefas';
 import { listarAreas } from '../src/db/queries/areas';
@@ -155,16 +156,16 @@ const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: tema.bg },
   container: { padding: tema.espacamento.lg },
   alertBox: {
-    backgroundColor: '#3a1a1a',
+    backgroundColor: acentos.reativacaoBg,
     borderRadius: tema.raio,
     padding: tema.espacamento.md,
     marginBottom: tema.espacamento.lg,
     borderLeftWidth: 4,
     borderLeftColor: tema.perigo,
   },
-  alertTag: { color: tema.perigo, fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 4 },
-  alertTitulo: { color: tema.texto, fontSize: tema.fonte.subtitulo, fontWeight: '700', marginBottom: tema.espacamento.sm },
-  alertTxt: { color: tema.texto, fontSize: tema.fonte.corpo, lineHeight: 22 },
+  alertTag: { color: acentos.reativacaoTag, fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 4 },
+  alertTitulo: { color: base.branco, fontSize: tema.fonte.subtitulo, fontWeight: '700', marginBottom: tema.espacamento.sm },
+  alertTxt: { color: acentos.textoSobreReativacao, fontSize: tema.fonte.corpo, lineHeight: 22 },
   label: { color: tema.textoFraco, fontSize: tema.fonte.pequeno, marginBottom: tema.espacamento.sm },
   textarea: {
     backgroundColor: tema.bgInput,

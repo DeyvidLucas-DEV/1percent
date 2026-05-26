@@ -10,22 +10,27 @@ type Props = {
 };
 
 export function Botao({ titulo, onPress, variante = 'primario', disabled, carregando }: Props) {
-  const cor =
+  const fundo =
     variante === 'primario' ? tema.acento :
     variante === 'perigo'   ? tema.perigo :
                               tema.bgInput;
+  // No light, tema.acento === tema.texto (#1A1916). Sem inverter, texto somia.
+  const corTxt =
+    variante === 'primario' ? tema.acentoTexto :
+    variante === 'perigo'   ? tema.perigoTexto :
+                              tema.texto;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || carregando}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: cor, opacity: (disabled || carregando) ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor: fundo, opacity: (disabled || carregando) ? 0.5 : pressed ? 0.85 : 1 },
       ]}
     >
       {carregando
-        ? <ActivityIndicator color={tema.texto} />
-        : <Text style={styles.txt}>{titulo}</Text>
+        ? <ActivityIndicator color={corTxt} />
+        : <Text style={[styles.txt, { color: corTxt }]}>{titulo}</Text>
       }
     </Pressable>
   );
@@ -40,7 +45,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   txt: {
-    color: tema.texto,
     fontSize: tema.fonte.corpo,
     fontWeight: '600',
   },

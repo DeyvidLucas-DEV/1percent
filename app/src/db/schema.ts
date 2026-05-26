@@ -116,6 +116,27 @@ CREATE TABLE IF NOT EXISTS user_trail_events (
 
 CREATE INDEX IF NOT EXISTS idx_trail_sync       ON user_trail_events(synced_at, occurred_at);
 CREATE INDEX IF NOT EXISTS idx_trail_tipo_data  ON user_trail_events(tipo, occurred_at);
+
+-- Cache local da análise semanal (gerada determinística, sem IA).
+-- Só uma linha; regenerada quando passou 3+ dias desde a última.
+CREATE TABLE IF NOT EXISTS analise_semanal_cache (
+  id               INTEGER PRIMARY KEY CHECK (id = 1),
+  gerada_em        TEXT    NOT NULL,
+  destaque         TEXT,
+  observacoes_json TEXT    NOT NULL
+);
+
+-- Cache local do clima (Open-Meteo + reverse geocoding). Uma linha,
+-- regenerada a cada ~30min ou se mudou de cidade.
+CREATE TABLE IF NOT EXISTS clima_cache (
+  id             INTEGER PRIMARY KEY CHECK (id = 1),
+  lat            REAL    NOT NULL,
+  lon            REAL    NOT NULL,
+  temperatura    REAL    NOT NULL,
+  codigo         INTEGER NOT NULL,
+  cidade         TEXT    NOT NULL,
+  capturado_em   TEXT    NOT NULL
+);
 `;
 
 const TABELAS_SYNC = ['areas', 'tarefas', 'execucoes', 'reflexoes_diarias', 'autoavaliacao_inicial', 'eventos'] as const;
@@ -160,6 +181,48 @@ async function rodarMigracoes(db: Db): Promise<void> {
     await db.execAsync(`ALTER TABLE users ADD COLUMN horario_trabalho_fim TEXT`);
   }
 
+  // Contexto de vida — preenchido no onboarding conversacional.
+  // Determina quais áreas ativar e quais tarefas sugerir.
+  if (!(await colunaExiste(db, 'users', 'trabalha'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN trabalha INTEGER`); // 0|1|null
+  }
+  if (!(await colunaExiste(db, 'users', 'tipo_trabalho'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN tipo_trabalho TEXT`); // clt|autonomo|empresario|servidor|freelancer
+  }
+  if (!(await colunaExiste(db, 'users', 'pratica_fe'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN pratica_fe INTEGER`); // 0|1|null
+  }
+  if (!(await colunaExiste(db, 'users', 'fe_denominacao'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN fe_denominacao TEXT`);
+  }
+  if (!(await colunaExiste(db, 'users', 'frequenta_comunidade'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN frequenta_comunidade INTEGER`); // 0|1|null
+  }
+  if (!(await colunaExiste(db, 'users', 'estuda'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN estuda INTEGER`); // 0|1|null
+  }
+  if (!(await colunaExiste(db, 'users', 'faz_terapia'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN faz_terapia INTEGER`); // 0|1|null
+  }
+
+  // Integração com Apple Calendar (Fase 3). Quando preenchido, o app cria
+  // eventos nesse calendário ao marcar tarefa com horário.
+  if (!(await colunaExiste(db, 'users', 'apple_calendar_conectado_em'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN apple_calendar_conectado_em TEXT`);
+  }
+  if (!(await colunaExiste(db, 'users', 'apple_calendar_id'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN apple_calendar_id TEXT`);
+  }
+  if (!(await colunaExiste(db, 'users', 'apple_calendar_titulo'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN apple_calendar_titulo TEXT`);
+  }
+
+  // Integração com Google Calendar (Fase 2 — backend ainda não implementado).
+  // Marca só "conectado" por enquanto, ID/scope vem na próxima fase.
+  if (!(await colunaExiste(db, 'users', 'google_calendar_conectado_em'))) {
+    await db.execAsync(`ALTER TABLE users ADD COLUMN google_calendar_conectado_em TEXT`);
+  }
+
   // Triggers que mantêm updated_at em dia automaticamente.
   // - INSERT: se a linha entrou sem updated_at, preenche agora.
   // - UPDATE: se ninguém mudou updated_at na operação, preenche.
@@ -190,4 +253,28 @@ export async function initSchema(): Promise<void> {
   const db = await getDb();
   await db.execAsync(SCHEMA_SQL);
   await rodarMigracoes(db);
+}
+
+/**
+ * Fecha a conexão atual e apaga o arquivo do SQLite local.
+ * Usado em "Apagar conta" pra garantir que o próximo bootstrap começa do zero
+ * (sem dados do user anterior contaminando a próxima conta).
+ *
+ * Após chamar, próximo `getDb()` recria o arquivo. Quem chamar é responsável
+ * por chamar `initSchema()` antes de usar.
+ */
+export async function resetDb(): Promise<void> {
+  if (_db) {
+    try {
+      await _db.closeAsync();
+    } catch {
+      // se já estiver fechado, segue
+    }
+    _db = null;
+  }
+  try {
+    await SQLite.deleteDatabaseAsync(DB_NAME);
+  } catch {
+    // se o arquivo não existir, segue
+  }
 }

@@ -12,6 +12,7 @@ import {
 import { useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tema } from '../../src/lib/tema';
+import { acentos } from '../../src/lib/paleta';
 import { PageHeader } from '../../src/components/ui/PageHeader';
 import { api, ApiError } from '../../src/lib/api';
 import { carregarDashboard } from '../../src/domain/agregados';
@@ -380,7 +381,7 @@ export default function PlanoSemanal() {
                 disabled={gerando}
               >
                 {gerando ? (
-                  <ActivityIndicator color="#F5F1E5" />
+                  <ActivityIndicator color={tema.acentoTexto} />
                 ) : (
                   <Text style={styles.botaoTxt}>Gerar plano</Text>
                 )}
@@ -635,7 +636,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   botaoTxt: {
-    color: '#F5F1E5',
+    color: tema.acentoTexto,
     fontFamily: tema.fontFamily.textBold,
     fontSize: 16,
   },
@@ -669,14 +670,14 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   intencaoKicker: {
-    color: 'rgba(245,241,229,0.7)',
+    color: acentos.textoSobreInkBaixo,
     fontSize: 11,
     fontFamily: tema.fontFamily.textBold,
     letterSpacing: 1.2,
     marginBottom: 6,
   },
   intencaoTxt: {
-    color: '#F5F1E5',
+    color: tema.acentoTexto,
     fontSize: 17,
     lineHeight: 23,
     fontFamily: tema.fontFamily.textBold,
@@ -773,7 +774,7 @@ const styles = StyleSheet.create({
   btnSec: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   btnAceitar: { backgroundColor: tema.acento },
   btnRecusar: { borderWidth: 1, borderColor: tema.bordaForte },
-  btnAceitarTxt: { color: '#F5F1E5', fontFamily: tema.fontFamily.textBold, fontSize: 14 },
+  btnAceitarTxt: { color: tema.acentoTexto, fontFamily: tema.fontFamily.textBold, fontSize: 14 },
   btnRecusarTxt: { color: tema.texto, fontFamily: tema.fontFamily.textSemi, fontSize: 14 },
   tagAceita: { color: tema.sucesso, fontSize: 12, fontFamily: tema.fontFamily.textBold },
   tagRecusada: { color: tema.textoFraco, fontSize: 12 },
@@ -784,7 +785,7 @@ const styles = StyleSheet.create({
     backgroundColor: tema.acento,
   },
   tagInegociavelTxt: {
-    color: '#F5F1E5',
+    color: tema.acentoTexto,
     fontSize: 12,
     fontFamily: tema.fontFamily.textBold,
   },

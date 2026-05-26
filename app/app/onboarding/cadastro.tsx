@@ -1,22 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Campo } from '../../src/components/Campo';
 import { Seletor } from '../../src/components/Seletor';
 import { Botao } from '../../src/components/Botao';
 import { tema } from '../../src/lib/tema';
-import { salvarCadastro } from '../../src/db/queries/users';
+import { getUser, salvarCadastro } from '../../src/db/queries/users';
+
+type EstadoCivil = 'solteiro' | 'casado' | 'divorciado' | 'viuvo';
 
 export default function Cadastro() {
   const router = useRouter();
+  const { modo } = useLocalSearchParams<{ modo?: string }>();
+  const editando = modo === 'editar';
+
   const [nome, setNome] = useState('');
   const [idade, setIdade] = useState('');
   const [sexo, setSexo] = useState<'M' | 'F' | 'O'>('M');
   const [peso, setPeso] = useState('');
   const [altura, setAltura] = useState('');
-  const [civil, setCivil] = useState<'solteiro' | 'casado' | 'divorciado' | 'viuvo'>('casado');
+  const [civil, setCivil] = useState<EstadoCivil>('casado');
   const [filhos, setFilhos] = useState('0');
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!editando) return;
+    (async () => {
+      const u = await getUser();
+      if (!u) return;
+      if (u.nome) setNome(u.nome);
+      if (u.idade) setIdade(String(u.idade));
+      if (u.sexo) setSexo(u.sexo as 'M' | 'F' | 'O');
+      if (u.peso_kg) setPeso(String(u.peso_kg));
+      if (u.altura_cm) setAltura(String(u.altura_cm));
+      if (u.estado_civil) setCivil(u.estado_civil as EstadoCivil);
+      if (typeof u.filhos === 'number') setFilhos(String(u.filhos));
+    })();
+  }, [editando]);
 
   async function avancar() {
     if (!nome.trim()) return Alert.alert('Faltou', 'Coloca seu nome.');
@@ -40,7 +60,11 @@ export default function Cadastro() {
         estado_civil: civil,
         filhos: filhosN,
       });
-      router.push('/onboarding/areas');
+      if (editando) {
+        router.back();
+      } else {
+        router.push('/onboarding/contexto' as any);
+      }
     } finally {
       setSalvando(false);
     }
@@ -48,8 +72,12 @@ export default function Cadastro() {
 
   return (
     <ScrollView style={styles.bg} contentContainerStyle={styles.container}>
-      <Text style={styles.titulo}>Antes de começar</Text>
-      <Text style={styles.sub}>O app vai medir o que você faz. Pra isso, precisa te conhecer.</Text>
+      <Text style={styles.titulo}>{editando ? 'Editar cadastro' : 'Antes de começar'}</Text>
+      <Text style={styles.sub}>
+        {editando
+          ? 'Atualize os dados que mudaram. O resto permanece como está.'
+          : 'O app vai medir o que você faz. Pra isso, precisa te conhecer.'}
+      </Text>
 
       <Campo label="Nome" valor={nome} onChangeText={setNome} placeholder="Seu nome" autoCapitalize="words" />
       <Campo label="Idade" valor={idade} onChangeText={setIdade} placeholder="35" keyboardType="numeric" />
@@ -79,7 +107,7 @@ export default function Cadastro() {
       <Campo label="Filhos" valor={filhos} onChangeText={setFilhos} keyboardType="numeric" />
 
       <View style={{ height: tema.espacamento.lg }} />
-      <Botao titulo="Continuar" onPress={avancar} carregando={salvando} />
+      <Botao titulo={editando ? 'Salvar' : 'Continuar'} onPress={avancar} carregando={salvando} />
       <View style={{ height: tema.espacamento.xl }} />
     </ScrollView>
   );

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>1% — Marca</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #DDD5C2; }
+  body {
+    font-family: "Inter", -apple-system, system-ui, sans-serif;
+    color: #1A1916; -webkit-font-smoothing: antialiased;
+  }
+  * { text-wrap: pretty; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="logo/marks.jsx"></script>
+<script type="text/babel" src="logo/showcase.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="overview" title="00 · Vitrine"
+        subtitle="7 conceitos lado a lado em fundo claro. Brutal honesto, anti-motivacional, sem floreio.">
+        {MARKS.map((m, i) => (
+          <DCArtboard key={i} id={`hero-${i}`} label={`${String(i+1).padStart(2,'0')} · ${m.name}`}
+            width={300} height={320}>
+            <MarkHeroCard mark={m}/>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="overview-dark" title="01 · Vitrine — fundo escuro"
+        subtitle="Mesmas marcas no carvão.">
+        {MARKS.map((m, i) => (
+          <DCArtboard key={i} id={`herod-${i}`} label={`${String(i+1).padStart(2,'0')} · ${m.name}`}
+            width={300} height={320}>
+            <MarkHeroCard mark={m} variant="dark"/>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="breakdown" title="02 · Variantes por marca"
+        subtitle="Light · Dark · Mono · App Icon 1024 · Adaptive Android.">
+        {MARKS.map((m, i) => (
+          <DCArtboard key={i} id={`bd-${i}`} label={`${m.name}`}
+            width={760} height={620}>
+            <MarkBreakdown mark={m}/>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="mockups" title="03 · Mockups · iOS / Android"
+        subtitle="Springboard iOS + launcher Android com cada ícone instalado.">
+        {MARKS.map((m, i) => (
+          <DCArtboard key={`ios-${i}`} id={`ios-${i}`} label={`iOS · ${m.name}`}
+            width={420} height={760}>
+            <div style={{ padding: 15 }}>
+              <IOSSpringboard mark={m}/>
+            </div>
+          </DCArtboard>
+        ))}
+        {MARKS.map((m, i) => (
+          <DCArtboard key={`and-${i}`} id={`and-${i}`} label={`Android · ${m.name}`}
+            width={410} height={760}>
+            <div style={{ padding: 15 }}>
+              <AndroidLauncher mark={m}/>
+            </div>
+          </DCArtboard>
+        ))}
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

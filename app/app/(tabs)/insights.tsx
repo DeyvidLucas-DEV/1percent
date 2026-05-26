@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Polyline, Line as SvgLine, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { tema } from '../../src/lib/tema';
+import { base } from '../../src/lib/paleta';
 import { PageHeader } from '../../src/components/ui/PageHeader';
 import { useAppStore } from '../../src/store/appStore';
 import { carregarDashboard, type DashboardData } from '../../src/domain/agregados';
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   calCellEmpty: { width: `${100 / 7}%`, aspectRatio: 1 },
-  calCellTxt: { color: '#0E0F12', fontSize: 10, fontWeight: '700' },
+  calCellTxt: { color: base.pretoQuase, fontSize: 10, fontWeight: '700' },
   legendaFaixas: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' },
   legendaFaixaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 4 },
   legendaQuadrado: { width: 10, height: 10, borderRadius: 2 },

@@ -24,11 +24,15 @@ export default function RootLayout() {
   const segments = useSegments();
   const { inicializado, logado, onboarded, setInicializado, setLogado, setOnboarded } = useAppStore();
 
-  const [bricolageOk] = useBricolage({ BricolageGrotesque_500Medium, BricolageGrotesque_700Bold });
-  const [interOk] = useInter({
+  const [bricolageOk, bricolageErr] = useBricolage({ BricolageGrotesque_500Medium, BricolageGrotesque_700Bold });
+  const [interOk, interErr] = useInter({
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
-  const fontesProntas = bricolageOk && interOk;
+  // Se a fonte falhar (bug do expo-font com newArchEnabled em produção, ou
+  // qualquer outro motivo), seguimos com a fonte do sistema em vez de
+  // travar eternamente na splash bege.
+  const fontesProntas =
+    (bricolageOk || !!bricolageErr) && (interOk || !!interErr);
 
   useEffect(() => {
     (async () => {
@@ -74,6 +78,8 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding/cadastro" options={{ title: 'Cadastro', headerBackVisible: false }} />
+          <Stack.Screen name="onboarding/contexto" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding/calendarios" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding/areas" options={{ title: 'Suas áreas' }} />
           <Stack.Screen name="onboarding/autoavaliacao" options={{ title: 'Onde você está' }} />
           <Stack.Screen name="checklist" options={{ title: 'Checklist do dia' }} />

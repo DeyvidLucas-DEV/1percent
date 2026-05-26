@@ -4,11 +4,60 @@ import { PROMPT_DAILY_NOTE } from './prompt.ts';
 
 // Schema da spec §9 — ExtracaoMemoriaIA.
 
+// Slugs das 10 áreas do app — fonte da verdade é app/src/domain/areasPaleta.ts.
+// CUIDADO: NÃO confundir com fatosCandidatos.categoria. Categoria de fato tem
+// 'rotina' (e não tem 'ministerio'); slug de área tem 'ministerio' (e não tem
+// 'rotina'). Vocabulários diferentes que se parecem 9/10. Usado por
+// impactoAreaSchema.areaSlug + repetido no PROMPT_DAILY_NOTE — manter sincronia.
+export const AREA_SLUGS = [
+  'espiritual',
+  'saude_fisica',
+  'familia',
+  'trabalho',
+  'saude_emocional',
+  'financas',
+  'ministerio',
+  'amizades',
+  'crescimento',
+  'sabedoria',
+] as const;
+export type AreaSlug = (typeof AREA_SLUGS)[number];
+
+// Lista fechada de rótulos de humor inferíveis do relato. Curta de propósito:
+// o objetivo é uma leitura plana, não taxonomia psicológica.
+export const TOM_LISTA = [
+  'tranquilo',
+  'neutro',
+  'tenso',
+  'sobrecarregado',
+  'abatido',
+  'irritado',
+  'exausto',
+] as const;
+export type Tom = (typeof TOM_LISTA)[number];
+
 export const eventoClassificadoSchema = z.object({
   tipo: z.enum(['stressor_reported', 'routine_pattern', 'area_neglected', 'preference_signal']),
   areaSlug: z.string().nullable(),
   descricao: z.string().min(1),
   confianca: z.enum(['baixa', 'media', 'alta']),
+});
+
+// Leitura emocional do dia, derivada SOMENTE do relato. Nunca de pergunta direta.
+// sinalAlerta=true dispara trava server-side em routes/ai.ts: suprime
+// recomendações e devolve card de cuidado fixo.
+export const leituraEmocionalSchema = z.object({
+  tom: z.enum(TOM_LISTA),
+  intensidade: z.enum(['baixa', 'media', 'alta']),
+  score: z.number().min(0).max(1),
+  sinalAlerta: z.boolean(),
+});
+
+// Como o estado emocional do dia tende a afetar áreas adiante. areaSlug
+// validado contra as 10 áreas. efeito é frase curta da IA.
+export const impactoAreaSchema = z.object({
+  areaSlug: z.enum(AREA_SLUGS),
+  efeito: z.string().min(1).max(140),
 });
 
 export const fatoCandidatoSchema = z.object({
@@ -77,6 +126,8 @@ export const extracaoMemoriaIaSchema = z.object({
   fatosCandidatos: z.array(fatoCandidatoSchema),
   episodio: episodioSchema,
   recomendacoesImediatas: z.array(recomendacaoImediataSchema).max(3),
+  leituraEmocional: leituraEmocionalSchema,
+  impactoAreas: z.array(impactoAreaSchema).max(5),
 });
 
 export type ExtracaoMemoriaIA = z.infer<typeof extracaoMemoriaIaSchema>;
@@ -191,8 +242,39 @@ const JSON_SCHEMA = {
           required: ['tipo', 'descricao', 'exigeConfirmacao', 'criarTarefa', 'pausarTarefa'],
         },
       },
+      leituraEmocional: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          tom: { type: 'string', enum: [...TOM_LISTA] },
+          intensidade: { type: 'string', enum: ['baixa', 'media', 'alta'] },
+          score: { type: 'number', minimum: 0, maximum: 1 },
+          sinalAlerta: { type: 'boolean' },
+        },
+        required: ['tom', 'intensidade', 'score', 'sinalAlerta'],
+      },
+      impactoAreas: {
+        type: 'array',
+        maxItems: 5,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            areaSlug: { type: 'string', enum: [...AREA_SLUGS] },
+            efeito: { type: 'string' },
+          },
+          required: ['areaSlug', 'efeito'],
+        },
+      },
     },
-    required: ['eventosClassificados', 'fatosCandidatos', 'episodio', 'recomendacoesImediatas'],
+    required: [
+      'eventosClassificados',
+      'fatosCandidatos',
+      'episodio',
+      'recomendacoesImediatas',
+      'leituraEmocional',
+      'impactoAreas',
+    ],
   },
 } as const;
 

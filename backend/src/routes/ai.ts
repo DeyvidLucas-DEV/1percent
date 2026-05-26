@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { userMemoryEpisodes, userMemoryFacts, userTrailEvents } from '../db/schema.ts';
+import {
+  userDailyReadings,
+  userMemoryEpisodes,
+  userMemoryFacts,
+  userTrailEvents,
+} from '../db/schema.ts';
 import { exigirAuth } from '../auth/middleware.ts';
 import { reservarChamadaIa } from '../ai/rateLimit.ts';
 import { gerarExtracaoMemoria, type ContextoDadosUsuario } from '../ai/dailyNote.ts';
@@ -18,8 +23,31 @@ import { violaBanlist } from '../ai/banlist.ts';
 export const aiRoutes = new Hono();
 aiRoutes.use('*', exigirAuth);
 
+// Card de cuidado fixo. Quando a IA marca sinalAlerta=true, o servidor
+// SUPRIME todas as recomendacoes (trava determinística, não confia no modelo
+// pra suavizar tom sob pressão) e devolve este card no lugar. Texto escrito
+// à mão pra ficar auditável e nunca virar cobrança. NÃO mover pra prompt.
+//
+// A linha do CVV 188 é condicional ("se precisar... agora") de propósito:
+// quem está só cansado lê e passa; quem está num lugar pior vê uma porta
+// concreta. CVV é gratuito, 24h, atendimento por voz no número 188 (Brasil).
+// Site: cvv.org.br — chat e e-mail também disponíveis.
+const CUIDADO_FIXO = {
+  titulo: 'Hoje o 1% não vai te cobrar.',
+  descricao:
+    'O que você descreveu pesa — e isso não é falha de processo. Descansar também é processo. Se conseguir, conta pra alguém: uma pessoa próxima ou um profissional de saúde mental. E se precisar falar agora com alguém que escuta, o CVV atende de graça, 24h, no 188.',
+} as const;
+
 const dailyNoteBody = z.object({
   relato: z.string().min(20).max(8000),
+  // Data LOCAL do usuário em YYYY-MM-DD. Obrigatório que venha do app pra evitar
+  // desalinhar leitura emocional quando relato é feito perto da meia-noite.
+  // Opcional por compat: callers antigos caem no fallback de derivar de occurredAt
+  // (UTC) — mas o app atual deve sempre enviar.
+  dataLocal: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'dataLocal deve ser YYYY-MM-DD')
+    .optional(),
   occurredAt: z.string().optional(),
   contextoDados: z
     .object({
@@ -273,6 +301,46 @@ aiRoutes.post('/daily-note', async (c) => {
     }
   }
 
+  // 2.6) Persistir leitura emocional do dia em user_daily_readings.
+  //      Last-write-wins por (user_id, data) — se o usuário fizer mais de um
+  //      daily-note no mesmo dia, o último prevalece. Data é a LOCAL do usuário
+  //      (do body), nunca derivada de UTC no servidor (evita relato perto da
+  //      meia-noite cair no dia errado). Fallback se app antigo não mandar:
+  //      occurredAt no formato YYYY-MM-DD em UTC — registro com aviso.
+  const leitura = resultado.extracao.leituraEmocional;
+  let dataLeitura = parsed.data.dataLocal;
+  if (!dataLeitura) {
+    dataLeitura = occurredAt.toISOString().slice(0, 10);
+    console.warn(
+      `[ai] daily-note ${tag}: dataLocal ausente, usando UTC ${dataLeitura} — caller antigo?`
+    );
+  }
+  try {
+    await db
+      .insert(userDailyReadings)
+      .values({
+        userId,
+        id: randomUUID(),
+        data: dataLeitura,
+        humorScore: leitura.score,
+        humorRotulo: leitura.tom,
+        sinalAlerta: leitura.sinalAlerta,
+        sourceEventId: dailyNoteEventId,
+      })
+      .onConflictDoUpdate({
+        target: [userDailyReadings.userId, userDailyReadings.data],
+        set: {
+          humorScore: leitura.score,
+          humorRotulo: leitura.tom,
+          sinalAlerta: leitura.sinalAlerta,
+          sourceEventId: dailyNoteEventId,
+        },
+      });
+  } catch (e) {
+    // Não derruba a resposta — leitura é incremental. Loga pra diagnóstico.
+    console.error(`[ai] daily-note ${tag}: FALHA ao persistir leitura emocional:`, e);
+  }
+
   // 2.7) Filtro de banlist server-side. gpt-4o-mini reincide em "Reserve",
   //      "Tempo de qualidade", "momento a sós" etc. mesmo com prompt claro.
   //      Descarta a rec inteira em vez de tentar reescrever (corre risco de
@@ -289,9 +357,35 @@ aiRoutes.post('/daily-note', async (c) => {
     return true;
   });
 
+  // 2.8) TRAVA sinalAlerta — defesa determinística sobre o modelo.
+  //      Banlist filtra palavra; isto filtra contexto. Quando o relato sinaliza
+  //      sofrimento real, NÃO confiamos no gpt-4o-mini pra suavizar a estrutura
+  //      das recomendações (mesma lição do banlist: o modelo reincide). Suprime:
+  //        - TODAS as recomendações: pra não cobrar.
+  //        - TODOS os impactoAreas: projeção de dano em cadeia é cobrança em
+  //          outro registro. Numa narração de sofrimento, a pessoa não pode
+  //          ver "isso afeta Trabalho, Saúde Física, Família" colado num card
+  //          que promete não cobrar — contradiz o ponto da trava.
+  //      Devolve um card de cuidado fixo no response (CUIDADO_FIXO).
+  //      LEITURA DIRETA e EU LEMBREI DISSO ficam — espelham o que foi dito,
+  //      não projetam consequência (o segundo é mais discutível mas atual).
+  let recomendacoesAposTrava = recomendacoesValidas;
+  let impactoAposTrava = resultado.extracao.impactoAreas;
+  let cuidado: typeof CUIDADO_FIXO | null = null;
+  if (leitura.sinalAlerta) {
+    const suprimidas = recomendacoesValidas.length;
+    const impactosSuprimidos = impactoAposTrava.length;
+    recomendacoesAposTrava = [];
+    impactoAposTrava = [];
+    cuidado = CUIDADO_FIXO;
+    console.warn(
+      `[ai] daily-note ${tag}: sinalAlerta=true tom=${leitura.tom} — suprimi ${suprimidas} recomendação(ões) e ${impactosSuprimidos} impacto(s) de área`
+    );
+  }
+
   // 3) atribui id às recomendações (pra o app gerar suggestion_accepted/rejected
   //    com payload referenciando esse id) e grava suggestion_presented na trilha.
-  const recomendacoesComId = recomendacoesValidas.map((r) => ({
+  const recomendacoesComId = recomendacoesAposTrava.map((r) => ({
     id: randomUUID(),
     tipo: r.tipo,
     descricao: r.descricao,
@@ -320,8 +414,9 @@ aiRoutes.post('/daily-note', async (c) => {
 
   return c.json({
     eventId: dailyNoteEventId,
-    extracao: resultado.extracao,
+    extracao: { ...resultado.extracao, impactoAreas: impactoAposTrava },
     recomendacoes: recomendacoesComId,
+    cuidado,
     episodiosLembrados: episodiosLembrados.map((e) => ({
       id: e.id,
       occurredAt: e.occurredAt,

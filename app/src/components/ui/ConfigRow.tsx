@@ -2,13 +2,15 @@ import { View, Text, Pressable, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { tema } from '../../lib/tema';
+import { light } from '../../lib/paleta';
+import { paletaArea } from '../../domain/areasPaleta';
 
 type Props = {
-  /** Nome do Ionicon (ex: 'log-out-outline'). Mutuamente exclusivo com `colorBox`. */
+  /** Nome do Ionicon (ex: 'log-out-outline'). */
   icon?: keyof typeof Ionicons.glyphMap;
-  iconColor?: string; // cor do icon (default: textoFraco)
-  /** Quadradinho colorido usado em listas de áreas (cor da área). */
-  colorBox?: string;
+  iconColor?: string;
+  /** Slug de área (ex: 'espiritual'). Renderiza dot estilo HabitCard com a paleta. */
+  paletaSlug?: string;
   title: string;
   value?: string;
   danger?: boolean;
@@ -21,7 +23,7 @@ type Props = {
 export function ConfigRow({
   icon,
   iconColor,
-  colorBox,
+  paletaSlug,
   title,
   value,
   danger,
@@ -31,6 +33,7 @@ export function ConfigRow({
   isLast,
 }: Props) {
   const Wrapper = onPress ? Pressable : View;
+  const paleta = paletaSlug ? paletaArea(paletaSlug) : null;
   return (
     <Wrapper
       onPress={onPress}
@@ -40,17 +43,24 @@ export function ConfigRow({
         pressed && { opacity: 0.55 },
       ]}
     >
-      {colorBox && <View style={[styles.colorBox, { backgroundColor: colorBox }]} />}
-      {icon && (
+      {paleta && (
+        <View style={styles.dotWrap}>
+          <View style={[styles.dotInner, { backgroundColor: paleta.ink }]} />
+        </View>
+      )}
+      {icon && !paleta && (
         <View style={styles.iconWrap}>
           <Ionicons
             name={icon}
             size={20}
-            color={danger ? tema.perigo : (iconColor ?? tema.textoFraco)}
+            color={danger ? tema.perigo : (iconColor ?? tema.weak)}
           />
         </View>
       )}
-      <Text style={[styles.titulo, danger && { color: tema.perigo }]} numberOfLines={1}>
+      <Text
+        style={[styles.titulo, danger && { color: tema.perigo }]}
+        numberOfLines={1}
+      >
         {title}
       </Text>
       {value !== undefined && <Text style={styles.value}>{value}</Text>}
@@ -58,20 +68,21 @@ export function ConfigRow({
         <Switch
           value={toggle}
           onValueChange={onToggle}
-          trackColor={{ false: tema.bgInput, true: tema.sucesso }}
-          thumbColor="#fff"
-          ios_backgroundColor={tema.bgInput}
+          trackColor={{ false: light.borda12, true: tema.ink }}
+          thumbColor={tema.bg}
+          ios_backgroundColor={light.borda12}
         />
       ) : null}
-      {value === undefined && toggle === undefined && !danger && onPress ? (
-        <Svg width={8} height={14} viewBox="0 0 8 14">
+      {toggle === undefined && !danger && onPress ? (
+        <Svg width={8} height={14} viewBox="0 0 8 14" style={{ marginLeft: 6 }}>
           <Path
             d="M1 1 L7 7 L1 13"
             fill="none"
-            stroke={tema.textoFraco}
+            stroke={tema.weak}
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
+            opacity={0.55}
           />
         </Svg>
       ) : null}
@@ -84,16 +95,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 16,
-    minHeight: 52,
+    paddingHorizontal: 18,
+    minHeight: 54,
     paddingVertical: 12,
   },
   divisor: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: tema.borda,
+    borderBottomColor: light.borda8,
   },
-  colorBox: { width: 24, height: 24, borderRadius: 6 },
-  iconWrap: { width: 24, alignItems: 'center', justifyContent: 'center' },
-  titulo: { flex: 1, color: tema.texto, fontSize: 15, fontWeight: '500' },
-  value: { color: tema.textoFraco, fontSize: 14 },
+  dotWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: light.borda5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotInner: { width: 8, height: 8, borderRadius: 4 },
+  iconWrap: { width: 22, alignItems: 'center', justifyContent: 'center' },
+  titulo: {
+    flex: 1,
+    color: tema.ink,
+    fontSize: 15,
+    fontFamily: tema.fontFamily.textSemi,
+  },
+  value: {
+    color: tema.weak,
+    fontSize: 13,
+    fontFamily: tema.fontFamily.text,
+  },
 });

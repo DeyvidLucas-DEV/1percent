@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "35114545174",
+    "project_id": "percent-509a7",
+    "storage_bucket": "percent-509a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:35114545174:android:dc742e325ca8ea5ce48537",
+        "android_client_info": {
+          "package_name": "com.umporcento.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7UpDbbO7ntl9aqHRdszXwSQusLMcXDeo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

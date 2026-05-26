@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>1% — Mockups</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #DDD5C2; }
+  body {
+    font-family: "Inter", -apple-system, system-ui, sans-serif;
+    color: #1B1A17;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { text-wrap: pretty; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="screens/shared.jsx"></script>
+<script type="text/babel" src="screens/Hoje.jsx"></script>
+<script type="text/babel" src="screens/Areas.jsx"></script>
+<script type="text/babel" src="screens/Insights.jsx"></script>
+<script type="text/babel" src="screens/Config.jsx"></script>
+<script type="text/babel" src="screens/Onboarding.jsx"></script>
+<script type="text/babel" src="screens/Analytics.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function Phone({ children }) {
+  return (
+    <IOSDevice dark={false} width={390} height={844}>
+      {children}
+    </IOSDevice>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="login" title="00 · Login"
+        subtitle="Cream + display Bricolage. Apple + Google.">
+        <DCArtboard id="login" label="Login" width={390} height={844}>
+          <Phone><ScreenLogin/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="onboarding" title="01 · Onboarding (5 passos)"
+        subtitle="Cadastro · Diagnóstico · Compromisso (com Gl 6:9) · Áreas opcionais · Autoavaliação.">
+        <DCArtboard id="onb1" label="A · Cadastro"      width={390} height={844}>
+          <Phone><ScreenOnbCadastro/></Phone>
+        </DCArtboard>
+        <DCArtboard id="onb2" label="B · Diagnóstico"   width={390} height={844}>
+          <Phone><ScreenOnbDiagnostico/></Phone>
+        </DCArtboard>
+        <DCArtboard id="onb3" label="C · Compromisso"   width={390} height={844}>
+          <Phone><ScreenOnbCompromisso/></Phone>
+        </DCArtboard>
+        <DCArtboard id="onb4" label="D · Áreas opcionais" width={390} height={844}>
+          <Phone><ScreenOnbAreas/></Phone>
+        </DCArtboard>
+        <DCArtboard id="onb5" label="E · Autoavaliação" width={390} height={844}>
+          <Phone><ScreenOnbAvaliacao/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="hoje" title="02 · Aba Hoje"
+        subtitle="Day pills + grid de hábitos com topo em onda + mini-charts. FAB central na tab bar.">
+        <DCArtboard id="hoje-base" label="A · Movimento · 47%" width={390} height={844}>
+          <Phone><ScreenHoje state="base"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="hoje-bom"  label="B · Construção · 78%" width={390} height={844}>
+          <Phone><ScreenHoje state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="hoje-ruim" label="C · Estagnação · 12%" width={390} height={844}>
+          <Phone><ScreenHoje state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="areas" title="03 · Aba Áreas"
+        subtitle="10 áreas em rows com topo em onda. Botão Alvo de Vida no topo (preto invertido).">
+        <DCArtboard id="areas-good" label="A · Saudável" width={390} height={844}>
+          <Phone><ScreenAreas state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="areas-bad"  label="B · Travado"  width={390} height={844}>
+          <Phone><ScreenAreas state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="alvo" title="04 · Alvo de Vida"
+        subtitle="Pizza de 10 fatias. Centro com a média e a faixa atual.">
+        <DCArtboard id="alvo-good" label="A · Saudável" width={390} height={844}>
+          <Phone><ScreenAlvo state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="alvo-bad"  label="B · Travado"  width={390} height={844}>
+          <Phone><ScreenAlvo state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="area-detail" title="05 · Detalhe da Área"
+        subtitle="Anel grosso na cor da área + barras da semana + grid de hábitos + meta com previsão.">
+        <DCArtboard id="ad-good" label="A · Saúde Física · 88%" width={390} height={844}>
+          <Phone><ScreenAreaDetail state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="ad-bad"  label="B · Espiritual · 12%"   width={390} height={844}>
+          <Phone><ScreenAreaDetail state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="analytics" title="06 · Analytics (3 abas)"
+        subtitle="Hoje (anel multi-segmento + score + Resumo) · Semana (cards por hábito com 7 dias) · Mês (calendário + line chart).">
+        <DCArtboard id="an-today-g"   label="Hoje · Saudável" width={390} height={844}>
+          <Phone><ScreenAnalyticsToday state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="an-today-b"   label="Hoje · Travado"  width={390} height={844}>
+          <Phone><ScreenAnalyticsToday state="bad"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="an-week-g"    label="Semana · Saudável" width={390} height={844}>
+          <Phone><ScreenAnalyticsWeekly state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="an-week-b"    label="Semana · Travado"  width={390} height={844}>
+          <Phone><ScreenAnalyticsWeekly state="bad"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="an-month-g"   label="Mês · Saudável" width={390} height={844}>
+          <Phone><ScreenAnalyticsMonthly state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="an-month-b"   label="Mês · Travado"  width={390} height={844}>
+          <Phone><ScreenAnalyticsMonthly state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="insights" title="07 · Insights (visão geral antiga)"
+        subtitle="Score multicor (estilo 9.0) + linha do mês + calendário em bolinhas + Top 6 + padrão.">
+        <DCArtboard id="ins-good" label="A · Saudável" width={390} height={844}>
+          <Phone><ScreenInsights state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="ins-bad"  label="B · Travado"  width={390} height={844}>
+          <Phone><ScreenInsights state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="day" title="07 · Detalhe do Dia">
+        <DCArtboard id="day-good" label="A · 78%" width={390} height={844}>
+          <Phone><ScreenDayDetail state="good"/></Phone>
+        </DCArtboard>
+        <DCArtboard id="day-bad"  label="B · 12%" width={390} height={844}>
+          <Phone><ScreenDayDetail state="bad"/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="reflexao" title="08 · Reflexão Diária">
+        <DCArtboard id="refl-empty" label="A · Vazia" width={390} height={844}>
+          <Phone><ScreenReflexao filled={false}/></Phone>
+        </DCArtboard>
+        <DCArtboard id="refl-fill"  label="B · Preenchida" width={390} height={844}>
+          <Phone><ScreenReflexao filled={true}/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="reativacao" title="09 · Reativação"
+        subtitle="Quando o usuário abandona o mínimo. Tom muda em 3+ dias.">
+        <DCArtboard id="rea-2d" label="A · 2 dias" width={390} height={844}>
+          <Phone><ScreenReativacao days={2}/></Phone>
+        </DCArtboard>
+        <DCArtboard id="rea-4d" label="B · 4 dias" width={390} height={844}>
+          <Phone><ScreenReativacao days={4}/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="config" title="10 · Configurações">
+        <DCArtboard id="cfg" label="Configurações" width={390} height={844}>
+          <Phone><ScreenConfig/></Phone>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

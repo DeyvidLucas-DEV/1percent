@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter } from 'expo-router';
 import { tema } from '../../lib/tema';
+import { acentos } from '../../lib/paleta';
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   index: 'home-outline',
@@ -46,7 +47,7 @@ export function TabBarPill({ state, navigation }: BottomTabBarProps) {
               <Ionicons
                 name={TAB_ICONS[nome]!}
                 size={22}
-                color={ativa ? tema.bg : 'rgba(232,226,210,0.55)'}
+                color={ativa ? tema.bg : acentos.iconeInativoSobreInk}
               />
             </Pressable>
           );
@@ -68,7 +69,7 @@ export function TabBarPill({ state, navigation }: BottomTabBarProps) {
               <Ionicons
                 name={TAB_ICONS[nome]!}
                 size={22}
-                color={ativa ? tema.bg : 'rgba(232,226,210,0.55)'}
+                color={ativa ? tema.bg : acentos.iconeInativoSobreInk}
               />
             </Pressable>
           );
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    shadowColor: '#000',
+    shadowColor: acentos.sombra,
     shadowOpacity: 0.18,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: -22,
-    shadowColor: '#000',
+    shadowColor: acentos.sombra,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },

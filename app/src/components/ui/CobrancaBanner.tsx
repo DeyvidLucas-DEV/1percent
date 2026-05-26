@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { tema } from '../../lib/tema';
+import { acentos } from '../../lib/paleta';
 
 type Props = {
   titulo?: string;
@@ -27,7 +28,7 @@ const styles = StyleSheet.create({
   box: {
     marginHorizontal: 20,
     marginBottom: 18,
-    backgroundColor: '#3A1411',
+    backgroundColor: acentos.cobrancaBg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: tema.perigo,
     borderRadius: 14,

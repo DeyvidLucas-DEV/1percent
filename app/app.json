@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "1%",
+    "name": "1Porcento",
     "slug": "app-1-percent",
     "scheme": "umporcento",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,12 +11,17 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#E8E2D2"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.umporcento.app",
       "infoPlist": {
+        "CFBundleDisplayName": "1%",
+        "NSCalendarsUsageDescription": "O 1% usa sua agenda pra criar eventos quando você marca tarefas com horário, e pra ver seus compromissos do dia junto com as tarefas.",
+        "NSCalendarsFullAccessUsageDescription": "O 1% precisa ler e escrever na sua agenda pra sincronizar tarefas com horário e mostrar seus compromissos do dia.",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "O 1% cria eventos na sua agenda quando você marca tarefas com horário.",
+        "NSLocationWhenInUseUsageDescription": "O 1% usa sua localização pra mostrar o clima da sua cidade na tela inicial. Usado só enquanto o app estiver aberto.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -28,17 +33,37 @@
               "com.googleusercontent.apps.863364734205-pauis7u6qhm56rqtq76uv6d24vc94lac"
             ]
           }
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.umporcento.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.863364734205-bvs2k3ukp1rb6b47jmgepnbkk4poghe6"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -56,10 +81,29 @@
         {
           "microphonePermission": "O 1% usa o microfone pra você gravar relatos por voz no Diário."
         }
-      ]
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "O 1% usa sua agenda pra sincronizar tarefas com horário e mostrar seus compromissos do dia."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ef2141d2-2081-4203-b626-76f3adddbd25"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ef2141d2-2081-4203-b626-76f3adddbd25"
     }
   }
 }
